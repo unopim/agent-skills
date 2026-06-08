@@ -69,25 +69,11 @@ These conventions differ from generic Laravel / Bagisto and MUST be followed:
 
 This project has domain-specific skills available. You MUST activate the relevant skill whenever you work in that domain — don't wait until you're stuck.
 
-- `unopim-package` — Generate complete production-ready UnoPim modules (ServiceProvider, ModuleServiceProvider, routes, ACL, menu, controllers, repositories, models with HistoryTrait, views, config, migrations, factories, contracts, composer.json).
-
-- `unopim-plugin-dev` — Plugin and package development. Activates when creating new packages, extending UnoPim, adding custom importers/exporters, configuring menus/ACL, or building admin features.
-
-- `unopim-backend-dev` — Backend PHP development. Activates when writing PHP code, creating classes, models, repositories, events, listeners, or tests. MUST be invoked before writing any PHP tests.
+- `unopim-plugin-development` — Plugin, package, and connector development — the comprehensive module-building skill. Activates when creating modules/packages, service providers, models, repositories, controllers, routes, ACL, menus, migrations, credentials, cURL HTTP clients, attribute mapping, or scaffolding a third-party connector. Reference sections: `@quickstart` (day-1 checklist), `@core` (package structure, service providers, config), `@backend` (PHP classes, models, repositories, events), `@credentials` (credential storage, connection testing, history), `@http` (cURL ApiClient, BasicAuth/OAuth), `@mapping` (attribute mapping + history).
 
 - `unopim-datagrid` — Implement DataGrid classes for admin listings with search, filter, sort, actions, and mass actions.
 
-- `unopim-credential-management` — Credential storage, API connection testing, secure field handling, history tracking, and CRUD for connector modules.
-
-- `unopim-http-client` — cURL-based HTTP client classes (ApiClient with retry, BasicAuth/OAuth strategies, connection testing). UnoPim uses cURL, NOT Guzzle.
-
-- `unopim-connector-quickstart` — Day-1 checklist and ordered steps to build a complete connector (WooCommerce, Shopify, Shopware, or any REST API) within one working day.
-
-- `unopim-connector-export-mapping` — Module attribute mapping and mapping history management for connectors.
-
-- `unopim-export-workflow` — End-to-end export/import workflow (exporters.php, quick_exporters.php, importers.php, Exporter classes, Validators, queue jobs, get-credentials route).
-
-- `unopim-data-transfer` — Import/export pipeline. Activates when configuring imports/exports, debugging job pipelines, or creating data transfer profiles.
+- `unopim-data-transfer` — Import/export pipeline and connector export/import workflow. Activates when configuring imports/exports, debugging job pipelines, creating data transfer profiles, or building connector export jobs (`@export-workflow` section: exporters.php, quick_exporters.php, importers.php, Exporter classes, Validators, queue jobs).
 
 - `unopim-code-review` — Code review. Activates when reviewing changes, checking standards compliance, flagging violations, or performing PR reviews.
 
