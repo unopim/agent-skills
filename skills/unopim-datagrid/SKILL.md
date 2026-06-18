@@ -22,6 +22,7 @@ All DataGrid patterns are derived from the WooCommerce connector reference:
 - Table names without prefix in DB::table() — Laravel adds DB_PREFIX
 - Use `bouncer()->hasPermission()` for action permission checks
 - Status badges: `class="label-active"` (true) and `class="label-info text-gray-600 dark:text-gray-300"` (false)
+- **Comments:** match Laravel core — no inline comments that narrate what the code does. The closure/url/permission patterns above are documented in this skill, not repeated as comments in generated code. Comment only a non-obvious _why_, one line.
 
 **Admin UI rule (critical):**
 - If the listing page includes form/filter controls in Blade, use UnoPim form components.
@@ -99,8 +100,6 @@ class CredentialDataGrid extends DataGrid
             'sortable'   => false,
         ]);
 
-        // Boolean column: use arrow function `fn ($row) =>` for closure
-        // Status badges: label-active (true) vs label-info (false)
         $this->addColumn([
             'index'      => 'status',
             'label'      => trans('{module-name}::app.credentials.datagrid.status'),
@@ -121,13 +120,11 @@ class CredentialDataGrid extends DataGrid
      */
     public function prepareActions()
     {
-        // Use bouncer()->hasPermission() for ACL checks
         if (bouncer()->hasPermission('{module-slug}.credentials.edit')) {
             $this->addAction([
                 'icon'   => 'icon-edit',
                 'title'  => trans('admin::app.catalog.attributes.index.datagrid.edit'),
                 'method' => 'GET',
-                // url uses regular function — NOT arrow function
                 'url'    => function ($row) {
                     return route('{module-slug}.credentials.edit', $row->id);
                 },

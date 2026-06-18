@@ -39,6 +39,7 @@ Activate this skill when:
 - Controllers return `JsonResponse` with `redirect_url` + `message`.
 - Sensitive fields go in `$auditExclude` — never `Crypt::encryptString()`.
 - Connectors use native cURL — not Guzzle, not the Laravel Http facade.
+- **Comments:** write Laravel-core style. Code self-documents; no inline comments narrating _what_ a line does, no multi-line essays inside methods, no section-divider comments. Comment only a non-obvious _why_, one line — or use the method PHPDoc.
 - ACL config = flat arrays (no nested `children`).
 - No hardcoded user-facing strings — use `trans('package::file.key')`.
 

@@ -37,6 +37,9 @@ Consult the `unopim-backend-dev` skill for detailed standards. Flag these violat
 - Missing docblocks on public/protected methods
 - Missing `@param`/`@return` annotations
 - Verbose docblocks (keep concise, one line ideal)
+- Inline comments that narrate _what_ the code does (the code already says it — delete them)
+- Multi-line comment blocks / essays inside a method body (move a genuine _why_ to the PHPDoc, one line)
+- Section-divider comments inside methods (`// Views`, `// Credentials`, `// ----`)
 
 **Data Integrity:**
 

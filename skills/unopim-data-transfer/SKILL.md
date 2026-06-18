@@ -10,6 +10,8 @@ metadata:
 
 The import/export pipeline uses a queued job system with state tracking.
 
+> **Comment style:** generated importer/exporter code follows Laravel-core conventions — no inline comments narrating what the code does, no multi-line comment blocks inside methods. Comment only a non-obvious _why_, one line.
+
 ## When to Use This Skill
 
 Invoke this skill when:
@@ -668,8 +670,7 @@ class Importer extends AbstractImporter
      */
     protected function processImportItem(array $item): void
     {
-        // Transform external item to Unopim product format
-        // and upsert via product repository
+        // Map $item to Unopim format, then upsert via the product repository.
     }
 }
 ```
