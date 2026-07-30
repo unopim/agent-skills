@@ -1,5 +1,14 @@
 # Backend: Models, Repositories, Events, Bindings
 
+## Contents
+
+- Model house style (Laravel 13 / PHP 8.4)
+- Contract interface
+- Repository
+- Events
+- Container bindings — Octane safety
+- Scale rules (catalog tables hold millions of rows)
+
 ## Model house style (Laravel 13 / PHP 8.4)
 
 Models use PHP attributes plus a `casts(): array` method — NEVER the legacy

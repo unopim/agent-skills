@@ -2,6 +2,15 @@
 
 Base class: `packages/Webkul/DataTransfer/src/Helpers/Exporters/AbstractExporter.php`. Working exemplar: `packages/Webkul/DataTransfer/src/Helpers/Exporters/Product/Exporter.php`. Copy the exemplar's shape; do not invent lifecycle methods.
 
+## Contents
+
+- The real contract
+- Exporter template
+- Sources must stream — `getResults()`
+- exporters.php
+- quick_exporters.php
+- Provider wiring and the list route
+
 ## The real contract
 
 | Member | Signature / value | Notes |

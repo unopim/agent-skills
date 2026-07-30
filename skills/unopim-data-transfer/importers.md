@@ -2,6 +2,15 @@
 
 Base class: `packages/Webkul/DataTransfer/src/Helpers/Importers/AbstractImporter.php`. Compact working exemplar: `packages/Webkul/DataTransfer/src/Helpers/Importers/Currency/Importer.php`. The heavyweight exemplar (chunked lookups, unique-value scans) is `packages/Webkul/DataTransfer/src/Helpers/Importers/Product/Importer.php`.
 
+## Contents
+
+- The real contract
+- importers.php
+- Importer template
+- Error codes
+- Bulk lookups — never one query per row
+- File sources
+
 ## The real contract
 
 | Member | Signature / value | Notes |

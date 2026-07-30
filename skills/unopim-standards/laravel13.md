@@ -6,6 +6,14 @@ NEVER write code, config or docs against "Laravel 12", "PHP 8.3" or "Pest 3" —
 all stale. Providers register in `bootstrap/providers.php`; `config/app.php` has
 no providers array.
 
+## Contents
+
+- Constructor property promotion
+- Explicit types everywhere
+- Models: PHP attributes + `casts()`
+- Enums
+- Validation and responses
+
 Prefer first-party Laravel features over custom code in every case: framework
 casts over accessors that decode, `Rule` objects over regex strings, queued
 jobs over cron scripts, `match()` over `if/elseif` chains on one subject.

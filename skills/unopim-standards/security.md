@@ -2,6 +2,18 @@
 
 Validate and authorize every entry point; fail closed on uncertainty.
 
+## Contents
+
+- ACL is fail-open — close it yourself
+- FormRequest `authorize()`
+- Uploads
+- XSS in DataGrids and Blade
+- Mass assignment
+- SSRF and CSV injection
+- Queries
+- Secrets at rest
+- CSRF
+
 Hook-enforced, so a violation is an exit code: `$guarded = []`; inline
 `validate()` in either spelling (`$request->validate()`, `Validator::make($request…)`,
 `$this->validate(request()…)`); a request value interpolated into `whereRaw`,

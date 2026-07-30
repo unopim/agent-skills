@@ -4,6 +4,16 @@ Credentials store API connection details for a third-party integration. Everythi
 mirrors the working implementation in `packages/Webkul/AiAgent` — copy from it, not from
 memory.
 
+## Contents
+
+- Non-negotiables
+- Migration
+- Credential model — the complete working pattern
+- Presenter
+- FormRequest
+- Controller
+- Checklist
+
 ## Non-negotiables
 
 - The secret is encrypted at rest via the `'encrypted'` Eloquent cast AND hidden via

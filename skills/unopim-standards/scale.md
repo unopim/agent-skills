@@ -4,6 +4,12 @@ Assume millions of product rows, 50k-attribute datasets and 10k-node category
 trees. Code that hydrates a catalog table whole is a bug even when the demo
 database is small.
 
+## Contents
+
+- The rules
+- Eager loading is a scale rule, not a micro-optimisation
+- Portability
+
 ## The rules
 
 - **No unbounded reads.** Never `->all()`, `->get()` or `->pluck()` on

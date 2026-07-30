@@ -1,5 +1,13 @@
 # Admin UI: Components, Theme Tokens, CRUD Pattern
 
+## Contents
+
+- Component-first (MANDATORY)
+- Theme color tokens (STRICT)
+- CRUD house pattern
+- Controller/view contract
+- Checklist
+
 ## Component-first (MANDATORY)
 
 ~140 component blades live under `packages/Webkul/Admin/src/Resources/views/components/`.

@@ -2,6 +2,16 @@
 
 Reference: `packages/Webkul/AiAgent` (connector-style plugin).
 
+## Contents
+
+- Directory layout
+- composer.json
+- Main service provider
+- ModuleServiceProvider — Concord model binding
+- Application registration
+- Menu config
+- Database rules
+
 ## Directory layout
 
 ```

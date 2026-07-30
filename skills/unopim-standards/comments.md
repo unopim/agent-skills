@@ -1,5 +1,14 @@
 # Comments
 
+## Contents
+
+- The bar
+- What IS allowed
+- The measured baseline
+- Good vs bad
+- Where a real rationale goes
+- Templates and generated code
+
 ## The bar
 
 The bar is absolute. UnoPim code carries **no inline comments of any kind**:

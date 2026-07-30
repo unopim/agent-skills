@@ -4,6 +4,15 @@ The shape every admin resource follows. Verified against the UnoPim checkout; ea
 rule names the file that proves it. Two of these are counter-intuitive and are the
 ones newcomers break: the save bar is automatic, and the breadcrumb is not.
 
+## Contents
+
+- The save bar is the only Save
+- Create is a modal on the index page
+- Breadcrumbs are a per-page step that is regularly forgotten
+- The page skeleton
+- The rest of the envelope
+- Checklist
+
 ## 1. The save bar is the only Save
 
 `x-admin::form` mounts the unsaved-changes tracker automatically — any invocation

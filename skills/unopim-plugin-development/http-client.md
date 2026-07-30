@@ -4,6 +4,15 @@ UnoPim connectors use native cURL — never Guzzle, never the Laravel `Http` fac
 In-repo exemplar: `packages/Webkul/AiAgent/src/Http/Client/AiApiClient.php` with
 `packages/Webkul/AiAgent/src/Http/Client/BearerToken.php`.
 
+## Contents
+
+- Rules
+- Auth strategies
+- ApiClient template
+- ApiException
+- Container binding
+- Checklist
+
 ## Rules
 
 - Check `curl_errno()` after every `curl_exec()`; always `curl_close()`.

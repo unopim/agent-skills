@@ -1,5 +1,16 @@
 # ACL and Security
 
+## Contents
+
+- The fail-open rule (read this first)
+- Routes template
+- ACL config — complete coverage
+- FormRequest authorization
+- Uploads
+- CSRF
+- SSRF and injection
+- Secrets and mass assignment
+
 ## The fail-open rule (read this first)
 
 The `['admin']` middleware is the Bouncer ACL gate
