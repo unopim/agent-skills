@@ -1,93 +1,98 @@
 ---
 name: unopim-code-review
-description: "Code review for UnoPim. Activates when reviewing code changes, checking standards compliance, flagging violations, or performing PR reviews; or when the user mentions review, standards, conventions, best practices, violations, or code quality."
-license: MIT
-metadata:
-  author: unopim
+description: Use when reviewing UnoPim code changes or a pull request for standards compliance, or when asked about conventions, best practices, violations or code quality in an UnoPim codebase. Trigger phrases include "review", "code review", "PR review", "standards", "conventions", "violations", "code quality".
+requires: unopim-standards
 ---
 
 # UnoPim Code Review
 
-Review code changes against UnoPim coding standards and conventions.
+**REQUIRED BACKGROUND:** Use unopim-standards — its reference files (`laravel13.md`, `security.md`, `performance.md`, `scale.md`, `extensibility.md`, `localization.md`, `comments.md`) are the rulebook. This skill is the checklist that applies them to a diff.
 
-## Critical Violations to Flag
+## Scope — ratchet, not archaeology
 
-### Backend PHP Code
+Review the lines the change ADDED or MODIFIED. Legacy violations on untouched lines are at most a remark, never a blocker — whole-file blocking would stall every legacy edit. A newly added violation is always in scope, even when it imitates adjacent legacy code.
 
-Consult the `unopim-backend-dev` skill for detailed standards. Flag these violations:
+## Blocking dimensions (any hit = request changes)
 
-**Architecture & Structure:**
+### 1. Comment noise — the #1 developer complaint
 
-- Missing Concord proxy model for new Eloquent models
-- Repository not extending `Webkul\Core\Eloquent\Repository`
-- Code placed outside the correct `packages/Webkul/{Package}/src/` directory
-- Missing interface/contract for new models
-- Direct `new Model()` instantiation instead of using repository pattern
+- ANY added comment inside a method body, object/array literal, route group, or Blade markup is a blocker — including one-line "why" comments, section dividers (`// Views`, `// ----`), and `{{-- --}}` narration.
+- The house baseline is zero: `packages/Webkul/Product/src/Repositories/ProductRepository.php` (18 methods) and `packages/Webkul/Product/src/Type/AbstractType.php` (988 lines) ship 0 inline comments.
+- A genuinely non-obvious rationale belongs in the class/method PHPDoc or the commit message. Method PHPDoc: one-line imperative summary; `@param`/`@return` only where no native type hint exists.
+- Mechanical sweep: every `git diff -U0` added line matching `^\+\s*(//|/\*|\{\{--)` is a finding.
 
-**Naming & Conventions:**
+### 2. Hardcoded colors
 
-- Class names not in PascalCase
-- Methods/variables not in camelCase
-- Event names not following `{domain}.{entity}.{action}.{before|after}` pattern
-- Route names not following dot-separated convention
-- Missing namespace declaration
+- Blockers: hex/rgb literals, `style="..."`, `<style>` blocks, arbitrary values (`bg-[#...]`), default intent scales (`violet-*`, `purple-*`, `red-*`, `green-*`, `blue-*`), and legacy `cherry-*` / `sky-*` / `unopim-primary-*` in new code.
+- Required: semantic tokens only — `primary` (+50–900), `primary-hover`, `success`, `warning`, `danger`, `info` — CSS vars in `packages/Webkul/Admin/src/Resources/assets/css/app.css` (`:root` + `.dark`), mapped in `packages/Webkul/Admin/tailwind.config.js`. A literal cannot follow the `.dark` variable swap, so dark mode breaks visibly.
+- Neutrals need a dark pairing, e.g. `text-primary-700 dark:text-primary-400`.
 
-**Documentation:**
+### 3. Raw HTML where an `x-admin::` component exists
 
-- Missing docblocks on public/protected methods
-- Missing `@param`/`@return` annotations
-- Verbose docblocks (keep concise, one line ideal)
-- Inline comments that narrate _what_ the code does (the code already says it — delete them)
-- Multi-line comment blocks / essays inside a method body (move a genuine _why_ to the PHPDoc, one line)
-- Section-divider comments inside methods (`// Views`, `// Credentials`, `// ----`)
+- Raw `<input>`, `<select>`, `<textarea>`, `<label>` in admin views = blocker: `x-admin::form.control-group` + `.label`/`.control`/`.error` exist.
+- Hand-built listing tables = blocker: use `x-admin::datagrid`. Custom fixed/backdrop divs = blocker: use `x-admin::modal` (+ `modal.confirm`) or `x-admin::drawer`.
+- ~140 component blades live under `packages/Webkul/Admin/src/Resources/views/components` — check there before accepting hand-rolled markup (switcher, flat-picker, tinymce, tabs, accordion, dropdown, tree, badge, shimmer).
+- Selects use `:options="json_encode(...)"` with `track-by`/`label-by` — never `@foreach` over `<option>`.
 
-**Data Integrity:**
+### 4. Duplication
 
-- Missing validation before data modification
-- Using `$guarded = []` on models
-- Missing CSRF protection on POST/PUT/DELETE routes
-- Unsanitized user input in queries
-- Missing ACL checks on admin routes
+- A block occurring 2+ times (logic or markup) must be extracted — method, component, or partial. Name the existing location to reuse.
 
-**Testing:**
+### 5. Scale — assume millions of rows
 
-- No tests for new functionality
-- Tests missing `beforeEach` login setup
-- Missing database assertions (`assertDatabaseHas`/`assertDatabaseMissing`)
-- Test not following Pest `it()`/`describe()` pattern
+- Unbounded `->all()`/`->get()`/`->pluck()` on catalog tables = blocker. Batch scans use `chunkById()`/`lazyById()` (`packages/Webkul/Completeness/src/Jobs/BulkProductCompletenessJob.php`).
+- **No hook covers most of this dimension — read the diff for it, do not assume an exit code did.** Only `Model::all()`, `$someRepository->all()` and `select('*')` are hook-blocked. A fluent chain ending in a bare `->get()`, a query inside a `foreach`, a missing eager load, a query in a Blade template, and a controller looping the catalogue instead of dispatching a `ShouldQueue` job are ALL invisible to the gate and are blockers here.
+- Bulk lookups: `array_chunk($keys, 1000)` + `whereIn` (`packages/Webkul/DataTransfer/src/Helpers/Importers/Product/SKUStorage.php`) — never per-row queries in a loop.
+- Export sources stream via id-cursor keyset pagination (`packages/Webkul/DataTransfer/src/Helpers/Sources/Export/ProductCursor.php`); the AbstractExporter `source->all()` default is acceptable only for small entities.
+- Multi-batch work is a `ShouldQueue` job, never inline request work. Data migrations stream too (cursor/chunkById).
+- New `where`/`orderBy`/filterable DataGrid columns need indexes. No query in loops or Blade. Eager-load every traversed relation.
 
-**Service Provider:**
+### 6. Portability — MySQL + PostgreSQL, table prefix, optional Elasticsearch
 
-- Missing route loading in `boot()`
-- Missing config merges in `register()` (menu, acl, importers, exporters)
-- Missing migration loading
-- Missing translation/view namespace registration
+- Raw SQL fragments (`DB::raw`, `selectRaw`, `whereRaw`, `orderByRaw`) naming tables must prepend `DB::getTablePrefix()` (`packages/Webkul/Measurement/src/DataGrids/UnitDataGrid.php`). Hardcoded `wk_` = blocker — no such prefix exists; `DB_PREFIX` defaults to empty.
+- MySQL-only SQL (GROUP_CONCAT, backticks, DATE_FORMAT, CAST AS SIGNED) = blocker. Cross-DB via `DB::rawQueryGrammar()` (`packages/Webkul/Core/src/Helpers/Database/Grammars/MySQLGrammar.php`, `packages/Webkul/Core/src/Helpers/Database/Grammars/PostgresGrammar.php`) or a `DB::getDriverName() === 'pgsql'` branch.
+- Any Elasticsearch call not gated on `config('elasticsearch.enabled')` with a DB fallback = blocker (`packages/Webkul/Product/src/Factories/ProductQueryBuilderFactory.php`).
 
-### Frontend Code
+### 7. Security
 
-- Missing `<x-admin::` component usage (using raw HTML instead)
-- Vue components not following project patterns
-- Missing translations (`@lang()` / `trans()`)
-- Hardcoded strings in UI — including dropdown placeholder `<option>` text, `title=""` tooltips, JS alert/error messages, and "Loading…" / "No results" status text. Every user-visible string must be a translation key (see unopim-backend-dev/coding-conventions.md → "Translations" section)
-- Translation key added to `en_US/app.php` only — must propagate to all 32 other locales with **natural** translations (not English copies); verify with `php artisan unopim:translations:check` showing 100% per locale
+- ACL is fail-open by route name (`packages/Webkul/User/src/Http/Middleware/Bouncer.php`): a write route — store, update, destroy, `mass_*` (snake_case keys), test-connection — absent from every acl.php is reachable by ALL logged-in admins = blocker. Bind write routes via `'also_authorizes'` (`packages/Webkul/Core/src/Tree.php`).
+- FormRequest on every endpoint; inline `request()->validate()` = blocker. `authorize(): true` only when the route name is ACL-gated; otherwise a bouncer check in `authorize()` (`packages/Webkul/Admin/src/Http/Requests/TinyMCEUploadRequest.php`). Shared/routeless endpoints gate in-controller (`packages/Webkul/Admin/src/Http/Controllers/MagicAI/MagicAIController.php`).
+- Uploads: mimes allowlist + max size + `FileMimeExtensionMatch` (`packages/Webkul/Core/src/Rules/FileMimeExtensionMatch.php`); accepting svg/html = blocker (script carriers).
+- Mass assignment: explicit `#[Fillable]` allowlist, no privilege columns in it; `$guarded = []` = blocker. Secrets at rest need `'encrypted'` cast + `#[Hidden]` + `$auditExclude` together (`packages/Webkul/AiAgent/src/Models/Credential.php`) — `$auditExclude` alone is not encryption.
+- Outbound URLs validated against SSRF (`packages/Webkul/Webhook/src/Validators/SafeWebhookUrl.php`); CSV export escapes formula operators (`packages/Webkul/DataTransfer/src/Helpers/Formatters/EscapeFormulaOperators.php`). No request input interpolated into SQL or DataGrid closure HTML.
+- **Two of the blockers above have no hook and are yours alone: ACL route coverage (a cross-file question — the route file and every `acl.php` must be read together, which a per-file gate cannot do) and `orderByRaw("$column $direction")` (identical on one line to the legitimate `whereRaw("$column IS NULL")` in the product filters).** Open `acl.php` and match it against the route file on every PR that adds a write route; do not accept "the hooks passed" as evidence for either.
 
----
+### 8. Localization
 
-## Review Approach
+- Any hardcoded user-facing string = blocker — including placeholders, tooltips, JS alerts, and "Loading…" status text. `trans()`/`@lang` with keys in `Resources/lang/en_US/` first, then all 33 locales, translated naturally (no English copies), `:placeholders` preserved.
+- Keys in a bare `en` directory = blocker — they never load; fallback locale is `en_US`.
 
-1. **Scan for critical violations** listed above
-2. **Cite specific skill files** when flagging issues
-3. **Provide correct examples** from the skill documentation
-4. **Group related issues** for clarity
-5. **Be constructive** — explain why the standard exists
+### 9. Octane safety
 
-## Output Format
+- A `singleton()` binding holding request or credential state = blocker; bind `scoped()` instead (`packages/Webkul/Core/src/Providers/CoreServiceProvider.php`, `packages/Webkul/Core/src/RequestMemo.php`). `singleton()` is for stateless infra only.
 
-For each violation found:
+### 10. Verification evidence
+
+- The PR must show the gates actually ran: `vendor/bin/pint --test`, `composer test` (Pest v5, MySQL and PgSQL), `composer phpstan`, `composer rector-dry`, Playwright for UI/admin changes, `php artisan unopim:translations:check`. "Should pass" with no output = not verified — request the run.
+- New `ignoreErrors` or `withSkip` entries added to make a gate pass = blocker.
+
+## High (fix before merge, not an instant block)
+
+- New model without Concord proxy/contract, or direct `new Model()` where a repository exists; repository not extending `Webkul\Core\Eloquent\Repository`.
+- Laravel 13 / PHP 8.4 idiom gaps: missing promoted constructor properties, return types, enums, `casts()` method, `#[Fillable]`/`#[Table]` attributes on models.
+- Migrations in the wrong folder — core packages use `src/Database/Migrations/` (plural); only plugin-style packages use root-level `Database/Migration/` (singular).
+- Provider not loading routes, config merges (menu under `'menu.admin'`, acl, importers/exporters), migrations, or translation/view namespaces.
+- No tests for new behavior; missing `assertDatabaseHas`/`assertDatabaseMissing`; not Pest `it()`/`describe()` style.
+- Event names not `{domain}.{entity}.{action}.{before|after}`; route names not dot-separated.
+
+## Verdict format
 
 ```text
-[Issue Type]: [Specific problem]
-Location: [File path and line number]
-Standard: [Link to relevant skill file]
-Fix: [Brief explanation or example]
+[Dimension] [Blocker|High|Medium]: one-sentence statement of the violation
+Location: file:line (added/changed line)
+Standard: unopim-standards/<reference file>   e.g. comments.md, security.md, scale.md
+Pattern: a real exemplar path under packages/Webkul showing the correct form
+Fix: the minimal change
 ```
+
+Every verdict MUST cite both the standards reference file and a real exemplar path. Group related findings; give the reason a standard exists in one clause, not a paragraph.
