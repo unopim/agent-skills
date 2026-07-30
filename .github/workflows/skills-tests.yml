@@ -1,0 +1,47 @@
+name: skills-tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out agent-skills
+        uses: actions/checkout@v4
+
+      # Exemplar-path linting needs a real UnoPim tree. A network or upstream
+      # failure here must not fail the build: the lint step below falls back to
+      # running without --unopim and annotates the run instead.
+      - name: Check out UnoPim for exemplar-path validation
+        id: unopim
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: unopim/unopim
+          path: .unopim
+          persist-credentials: false
+
+      - name: Lint skills
+        run: |
+          if [ -d .unopim/packages/Webkul ]; then
+            bin/lint-skills.sh --unopim .unopim
+          else
+            echo "::warning title=UnoPim checkout unavailable::Skipping exemplar-path validation; cited packages/Webkul paths were not verified."
+            bin/lint-skills.sh
+          fi
+
+      - name: Run tests
+        run: skills/tests/run-tests.sh
+
+      - name: Smoke-test the installer
+        run: |
+          workspace="$(mktemp -d)"
+          mkdir -p "$workspace/.claude"
+          ( cd "$workspace" && "$GITHUB_WORKSPACE/bin/install-skills.sh" --copy -a claude unopim-plugin-development )
+          test -f "$workspace/.claude/skills/unopim-standards/SKILL.md"

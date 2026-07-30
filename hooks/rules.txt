@@ -1,0 +1,372 @@
+# ---------------------------------------------------------------------------
+# grep-gate rule table. One rule per line, TILDE-delimited:
+#
+#     id~path-regex~content-regex~message
+#
+# The delimiter is ~ rather than | because nearly every regex below needs |
+# for alternation. No field may contain a ~. Lines starting with # are
+# comments; blank lines are ignored.
+#
+# Both regexes are PCRE (grep -P), matched unanchored: the path regex against
+# the edited file path, the content regex against ONLY the lines this edit
+# added. Exclusions belong in the path regex, written as a leading
+# ^(?!.*<excluded>) lookahead so they read next to what they exempt.
+#
+# The message is fed to the model when the rule fires, so it must state the
+# FIX, not the sin. Keep one blank-line-separated group per concern; the
+# groups are the tuning unit.
+#
+# NEW_CSS_FILE is a path rule, not a content rule, and lives in grep-gate.sh,
+# alongside the vendored/generated path skips every rule inherits.
+#
+# CALIBRATION. Every rule below is tuned against a real baseline: the files
+# touched by the last 40 commits of the unopim-variants working tree: 1261
+# files, 1007 after grep-gate.sh drops the vendored and generated paths, each
+# treated as if wholly added, which is how the gate sees a new file. The
+# target is zero hits on idiomatic core code, because a rule that fires on
+# code the team writes on purpose teaches the model to route around the gate.
+# Hit counts quoted in the comments are against that baseline. Re-run the
+# calibration before widening any regex.
+#
+# Two shared exclusions recur and mean the same thing everywhere:
+#   /[Tt]ests?/, .spec., .test.  Test code is not product code: fixture
+#       colours, selector strings, step comments and Arrange/Act/Assert
+#       banners are all correct there.
+#   Resources/views/(public|errors)/  Standalone <!doctype html> pages served
+#       outside the admin bundle (product passport, publication error pages).
+#       Like emails, they have no Tailwind and no CSS-variable theme, so hex,
+#       rgba() and <style> are the only thing that works.
+# ---------------------------------------------------------------------------
+
+# --- Design system -----------------------------------------------------
+# Source of truth: packages/Webkul/Admin/tailwind.config.js and
+# src/Resources/assets/css/app.css. tailwind.config.js declares the tokens and
+# the legacy families, so it is exempt. Resources/views/emails is exempt from
+# this whole group and the next: mail clients do not run Tailwind or CSS
+# variables, so inline styles, hex literals and table layout are correct there.
+#
+# Installer/src/Resources/views is exempt from this whole group for the same
+# structural reason. That page renders before the application exists: it pulls
+# in zero x-admin components, carries zero `dark:` classes, and has no config
+# table to read a theme from, so there is no token layer for it to use.
+#
+# INLINE_STYLE: the (?<![:\w-]) lookbehind is what separates a static
+# style="width: 240px" (fixable) from Vue's :style="gridTemplate(columns)" and
+# :style="{ background: record.swatch_value }" (a runtime-computed binding
+# that no utility class can express). 37 -> 16 hits, every one of them a
+# static declaration a utility class can carry.
+INLINE_STYLE~^(?!.*(Resources/views/(emails|public|errors)/|Installer/src/Resources/views/|/[Tt]ests?/|\.spec\.|\.test\.)).*\.(blade\.php|vue)$~(?<![:\w-])style="~Inline styles bypass the design tokens and dark mode. Express it as Tailwind utility classes on the element.
+
+# STYLE_BLOCK now exempts Resources/views/components/ on the same principle as
+# the three rules below it: a component is where the markup and the CSS it
+# cannot express are allowed to live. All 8 baseline hits were that -- the
+# root layout injecting the operator's own
+# general.content.custom_scripts.custom_css, a [v-cloak] FOUC guard for the
+# <v-promo-bar> custom element, a ::-webkit-search-cancel-button reset. None
+# is expressible as a utility class. What is left is the target: a feature
+# page shipping its own CSS. 8 -> 0 hits.
+STYLE_BLOCK~^(?!.*(Resources/views/(emails|public|errors)/|Resources/views/components/|Installer/src/Resources/views/|/[Tt]ests?/)).*\.(blade\.php|vue)$~<style[\s>]~A style block bypasses the design system. Express it as Tailwind utility classes, or add the token to app.css.
+
+# HEX_COLOR: (?<!&) and the (?![0-9]{3,4}\b) veto drop the two things that are
+# not colours and made up most of the noise -- HTML numeric entities (&#9650;
+# for a caret glyph) and GitHub issue references (Issue #243, "(#755)"). Cost:
+# a pure-digit short hex such as #000 is no longer caught; #000000 still is.
+# 49 -> 10 hits. components/tinymce is exempt as well: its hex lives in the
+# content_style string TinyMCE injects into its own editor iframe, a
+# document the admin stylesheet never reaches. Of the 10 that remain, 8 are
+# an SVG icon fill="#27272A" -- real, and fixable with fill="currentColor".
+# KNOWN RESIDUAL, 1 line: configuration/field-type.blade.php seeds a colour
+# PICKER with :value="value != '' ? value : '#ffffff'". That hex is data the
+# user is about to overwrite, not styling, and it is indistinguishable on one
+# line from fill="#ffffff". Left in deliberately rather than papered over.
+HEX_COLOR~^(?!.*(tailwind\.config\.js|Resources/views/(emails|public|errors)/|Resources/views/components/tinymce/|Installer/src/Resources/views/|/[Tt]ests?/|\.spec\.|\.test\.)).*\.(blade\.php|vue|js)$~(?<!&)#(?![0-9]{3,4}\b)([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b~A hex colour cannot follow the .dark CSS variable swap, so dark mode breaks visibly. Use a semantic class: primary, primary-hover, success, warning, danger or info.
+
+# RGB_COLOR: (?<![_\[]) exempts Tailwind arbitrary values, where the rgba()
+# sits inside the class itself -- shadow-[0px_8px_24px_0px_rgba(0,0,0,0.05)].
+# That IS a utility class, so demanding one back was incoherent. 17 -> 0 hits.
+RGB_COLOR~^(?!.*(tailwind\.config\.js|Resources/views/(emails|public|errors)/|Installer/src/Resources/views/|/[Tt]ests?/|\.spec\.|\.test\.)).*\.(blade\.php|vue|js)$~(?<![_\[])rgba?\(\s*(?!var\()~A colour literal cannot follow the .dark variable swap. Use a semantic class, or reference the token as rgb(var(--c-primary-600)).
+
+# TAILWIND_INTENT is the highest-traffic rule that survives calibration:
+# 103 -> 91 hits. The 91 it keeps are debt rather than misreadings:
+# text-red-600 and border-red-500 are the entrenched validation-error
+# styling, and `danger` is a real class that compiles, so every one of them
+# has a one-word fix. The
+# ratchet is what makes that affordable -- only newly written lines pay.
+# KNOWN RESIDUAL: 14 of the 91 are the activity chips in
+# dashboard/recent-activity.blade.php, which colour-code SIX categories
+# (amber, sky, teal, ...). That is categorical decoration, not intent, and
+# four semantic tokens cannot express it -- the rule is genuinely wrong there.
+# No line-level regex separates a category chip from an intent colour; the fix
+# is a categorical badge scale in app.css, after which this note can go.
+# yellow, lime and pink were added to the family list after a sweep found
+# bg-yellow-100/text-yellow-800 is the natural spelling of a "pending" pill and
+# was walking straight past the rule. +10 lines over 7 files on the wide sweep
+# (321 -> 331), every one of them intent colouring with the exact one-word fix
+# `warning`. slate/zinc/neutral/stone stay OUT deliberately: they are surface
+# neutrals with no semantic token to move to, and adding them would repeat the
+# cherry-* mistake recorded above.
+TAILWIND_INTENT~^(?!.*(tailwind\.config\.js|Resources/views/(emails|public|errors)/|Installer/src/Resources/views/|/[Tt]ests?/|\.spec\.|\.test\.)).*\.(blade\.php|vue|js)$~\b(violet|purple|fuchsia|indigo|red|rose|orange|amber|yellow|lime|pink|green|emerald|teal|cyan|blue)-(950|50|[1-9]00)\b~Default Tailwind scales are not themable and ignore .dark. Use primary, primary-hover, success, warning, danger or info.
+
+# SHORT_HEX picks up what HEX_COLOR's (?![0-9]{3,4}\b) veto gives away. That
+# veto exists to drop &#9650; entities and "(#755)" issue refs, so this rule
+# earns the short hex back by demanding a colour PROPERTY in front of it:
+# fill="#333", bg-[#111], background-color: #000. 0 hits on the wide sweep.
+SHORT_HEX~^(?!.*(tailwind\.config\.js|Resources/views/(emails|public|errors)/|Resources/views/components/tinymce/|Installer/src/Resources/views/|/[Tt]ests?/|\.spec\.|\.test\.)).*\.(blade\.php|vue|js)$~(fill|stroke|color|background|background-color|border-color|bg-\[|text-\[|border-\[|ring-\[)["'=:\s\[]*#[0-9]{3,4}\b~A three or four digit hex is still a baked colour the .dark swap cannot reach. Use a semantic class, or add the token to app.css.
+
+# ARBITRARY_RGB closes the route-around from the hex spelling of an arbitrary
+# value to the rgb() spelling: an agent blocked on bg-[#7C3AED] otherwise
+# "fixes" it to bg-[rgb(124,58,237)] and is clean by the gate and still
+# un-themable. The family prefix is load-bearing -- rgb must follow the opening
+# bracket immediately, so the shadow-[0px_8px_24px_0px_rgba(0,0,0,0.05)]
+# exemption RGB_COLOR was tuned for above cannot re-break. 0 hits.
+ARBITRARY_RGB~^(?!.*(tailwind\.config\.js|Resources/views/(emails|public|errors)/|Installer/src/Resources/views/|/[Tt]ests?/|\.spec\.|\.test\.)).*\.(blade\.php|vue|js)$~\b(bg|text|border|ring|fill|stroke|from|via|to|shadow)-\[(?:rgb|rgba|hsl|hsla)\((?!var\()~An arbitrary Tailwind colour value is a baked literal the .dark swap cannot reach. Use primary, primary-hover, success, warning, danger or info.
+
+# PHP_MARKUP_COLOR: a DataGrid addColumn closure is the commonest place this
+# codebase emits coloured HTML, and every rule above it stops at the .php
+# boundary. Resources/lang is excluded because 33 locale files carry the same
+# mail string with a style=":style" PLACEHOLDER -- 36 hits, all of them the
+# same non-colour. The bare-hex branch is excluded too: in non-Blade PHP a hex
+# is far more often DATA than styling (AttributeOptionController seeds a colour
+# picker with '#000000'), the same residual HEX_COLOR documents above.
+# 1 hit after both exclusions, and it is real: ImportDataGrid returns
+# class="text-violet-700 dark:text-sky-500" from a closure.
+PHP_MARKUP_COLOR~^(?!.*(\.blade\.php|Resources/lang/|/Config/|/[Tt]ests?/|\.spec\.|\.test\.)).*\.php$~(class=\\?"[^"]*\b(violet|purple|fuchsia|indigo|red|rose|orange|amber|yellow|lime|pink|green|emerald|teal|cyan|blue)-(950|50|[1-9]00)\b|style=\\?"[^"]*(#[0-9a-fA-F]{3,8}|rgba?\())~Markup built in PHP (DataGrid closures, presenters, mail builders) bypasses the token system exactly as Blade does. Use the prebuilt classes label-active and label-info, or the semantic classes primary, success, warning, danger and info.
+
+# CSS_COLOR_LITERAL is what keeps an ALREADY-TRACKED stylesheet honest.
+# NEW_CSS_FILE fires once, on a stylesheet's first write, and every colour
+# added to it afterwards was invisible because no content rule carried a .css
+# path regex. The (?<!/app) lookbehind exempts both app.css token files, which
+# is where a colour is SUPPOSED to be declared. DebugBar/widget.css is a
+# vendored debug widget and holds the only other colour literals in core.
+# 0 hits once those two are out.
+CSS_COLOR_LITERAL~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.|node_modules/|/build/|/dist/|/DebugBar/)).*(?<!/app)\.(css|scss|less)$~(?<!&)#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b|(?<![_\[])rgba?\(\s*(?!var\()~A colour literal in a stylesheet cannot follow the .dark variable swap. Declare it as a CSS custom property in packages/Webkul/Admin/src/Resources/assets/css/app.css and reference it as rgb(var(--c-token)).
+
+# LEGACY_TOKEN: cherry was REMOVED from this family list, deliberately.
+# cherry-700/800/900 is the dark-mode surface chrome (dark:bg-cherry-800 and
+# friends) and there is no --c-surface token to move it to: the rule was
+# ordering 313 of its 321 baseline hits to swap a background for "danger or
+# success", which is not a fix. Add a surface token to app.css first, then put
+# cherry back. unopim-primary-* and sky-* stay because their replacement is
+# exact -- sky-500 #0C8CE9 IS --c-info, unopim-primary-600 #7C3AED IS
+# --c-primary-600. 259 -> 4 hits, all of them an exact one-word swap.
+LEGACY_TOKEN~^(?!.*(tailwind\.config\.js|Resources/views/(emails|public|errors)/|Installer/src/Resources/views/|/[Tt]ests?/|\.spec\.|\.test\.)).*\.(blade\.php|vue|js)$~\b(unopim-primary|sky)-\d{2,3}\b~unopim-primary-* and sky-* are baked hex an integrator cannot re-skin, and they have an exact token equivalent: unopim-primary-N maps to primary-N, sky-500 maps to info.
+
+# --- Components --------------------------------------------------------
+# 40+ component directories already exist under
+# packages/Webkul/Admin/src/Resources/views/components. The components
+# themselves are exempt: they are where the raw markup is allowed to live.
+#
+# RAW_FORM_CONTROL previously exempted only components/form/, which
+# contradicted the paragraph above and made every other component directory --
+# media, associations, tinymce, products, categories -- a violation for
+# containing the markup it exists to encapsulate. It now exempts
+# Resources/views/components/ like its two neighbours do. The Installer views
+# are exempt too: that page loads zero x-admin components (it renders before
+# the app is installed), so there is nothing to wrap the field in. Hidden
+# inputs are exempt because a control-group has no way to express one -- no
+# label, no error slot, nothing to render. 167 -> 64 hits.
+#
+# KNOWN RESIDUAL, the one this table cannot close: 28 of those 64 are a hidden
+# input written across several lines, where `type="hidden"` sits on the line
+# AFTER `<input` and a line-scoped grep cannot see it. The exemption cannot be
+# widened to a bare `<input` line without losing the rule's best catch -- a
+# hand-rolled `<input type="text">` carrying a copy-pasted class list inside a
+# control-group, which is written exactly the same way. So the message names
+# the exemption instead, and the model resolves it in one read. Closing this
+# properly means teaching grep-gate.sh to join lines inside an unclosed tag
+# before matching; until then, treat a hidden-input hit as a no-op.
+RAW_FORM_CONTROL~^(?!.*(Resources/views/components/|Resources/views/(emails|public|errors)/|Installer/src/Resources/views/|/[Tt]ests?/)).*Resources/views/.*\.blade\.php$~<(select|textarea|label)\b|<input\b(?![^>]*type="hidden")~Wrap the field in x-admin::form.control-group and use its label, control and error components. A raw control skips validation display, labelling and styling. A hidden input is exempt: if that is what this flagged, leave it and move on.
+RAW_TABLE~^(?!.*(Resources/views/components/|Resources/views/(emails|public|errors)/|/[Tt]ests?/)).*Resources/views/.*\.blade\.php$~<table\b~Render listings with x-admin::datagrid and a DataGrid class. A hand-rolled table loses search, filters, sorting, pagination and mass actions.
+RAW_MODAL~^(?!.*(Resources/views/components/|Resources/views/(emails|public|errors)/|/[Tt]ests?/)).*Resources/views/.*\.blade\.php$~(role="dialog"|aria-modal)~Use x-admin::modal. A hand-rolled dialog loses focus trapping, escape handling and the close behaviour.
+
+# RAW_OVERLAY exists because RAW_MODAL keys on the two tokens a UnoPim-shaped
+# hand-rolled modal never has. The core v-modal ships ZERO aria: neither
+# role="dialog" nor aria-modal appears anywhere under the Admin views tree. So
+# an agent imitating house style writes a fixed/backdrop div with no ARIA and
+# walks past RAW_MODAL, which as written only catches an agent being MORE
+# accessible than core. The overlay geometry is the tell instead, and it is
+# stable: every modal, drawer and confirm in core opens with fixed inset-0.
+# 2 hits, both a genuine hand-rolled modal outside components
+# (Webhook logs/_grid.blade.php). Components are exempt: that is where the
+# real modal markup is allowed to live.
+RAW_OVERLAY~^(?!.*(Resources/views/components/|Resources/views/(emails|public|errors)/|Installer/src/Resources/views/|/[Tt]ests?/)).*Resources/views/.*\.blade\.php$~class="[^"]*\bfixed\b[^"]*\binset-0\b~Use x-admin::modal, x-admin::modal.confirm or x-admin::drawer. A fixed inset-0 overlay is a hand-rolled dialog and loses focus trapping, escape handling and the close behaviour.
+
+# RAW_LISTING covers the listing RAW_TABLE cannot see. RAW_TABLE keys on the
+# literal <table> tag, so a Tailwind `grid grid-cols-3` listing -- which is
+# what an agent told to use utility classes actually writes -- is invisible.
+# Hand-rolled pagination is the one token that shape cannot avoid, and it is
+# also the strongest signal: a template computing its own page links is a
+# listing that has no search, no filters, no sorting and no mass actions.
+# 0 hits: core paginates through x-admin::datagrid, never in a template.
+RAW_LISTING~^(?!.*(Resources/views/components/|Resources/views/(emails|public|errors)/|/[Tt]ests?/)).*Resources/views/.*\.blade\.php$~(previousPageUrl|nextPageUrl|->links\(\))~Render listings with x-admin::datagrid and a DataGrid class. Pagination hand-rolled in a template means the listing also has no search, filters, sorting or mass actions.
+
+# --- Comments -----------------------------------------------------------
+# The bar is ABSOLUTE, by the repository owner's decision (2026-07-31):
+# no inline comments in code. Not a narration, not a one-line "why", not a
+# banner, not commented-out code, not a Blade comment. A rationale worth
+# keeping goes in the class or method PHPDoc (/** ... */), which these rules
+# never touch, or in the commit message. Code carries its meaning in names.
+#
+# The ratchet is what makes an absolute bar liveable: these rules judge only
+# the lines an edit ADDS. The comments already in the codebase stay exactly
+# where they are and block nothing; what they cannot do is grow. Measured on
+# the added lines of the last five commits, the rule fires 3 times.
+#
+# Allowed and never matched: /** PHPDoc */ blocks and their " * " body lines,
+# PHP 8 attributes (#[Fillable]), URLs inside strings, and anything under a
+# tests directory or a .spec./.test. file, where a comment marks intent for a
+# reader who cannot see the assertion's purpose from its name.
+INLINE_COMMENT~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.(php|js|vue)$~(^|\s)//(?!.*(?:https?:|s3:|ftp:|file:))|^\s*/\*(?!\*)|\S\s+/\*(?!\*)|^\s*#(?!\[|!)~Delete it. UnoPim code carries no inline comments: rename the variable or extract a method until the line explains itself, and put a rationale worth keeping in the method PHPDoc.
+BLADE_COMMENT~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.blade\.php$~\{\{--~Delete it. Blade markup carries no comments: name the section with a component or a variable, and put anything a maintainer must know in the PHPDoc of the code that feeds this view.
+
+# --- Validation and mass assignment ------------------------------------
+INLINE_VALIDATE~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.php$~(\$request|request\(\))->validate\(~Type-hint a FormRequest, move the rules into its rules() method, and gate the action in authorize().
+# INLINE_VALIDATOR_MAKE closes INLINE_VALIDATE's retry route. An agent blocked
+# on $request->validate() reaches for Validator::make($request->all(), ...) or
+# $this->validate(request(), ...) next; both skip authorize(), which is the ACL
+# backstop security.md relies on for routeless endpoints. The first argument
+# must BE the request: measured without that anchor the rule fired 62 times,
+# almost all of them legitimate -- dedicated Validator classes and CSV-row
+# importers, where there is no HTTP request and so no FormRequest to move to.
+# Http/Requests is excluded so a FormRequest may still compose a Validator
+# internally. 25 lines over 15 files remain, all of them $this->validate(
+# request(), [...]) in Admin controllers: real debt with an exact fix, free
+# under the ratchet, and the same sin INLINE_VALIDATE already blocks in the
+# other spelling.
+INLINE_VALIDATOR_MAKE~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.|Http/Requests/)).*\.php$~Validator::make\(\s*(?:\$request\b|request\(\))|\$this->validate\(\s*(?:\$request\b|request\(\))~Type-hint a FormRequest, move the rules into its rules() method, and gate the action in authorize().
+# GUARDED_EMPTY's message used to order an explicit $fillable, which was the
+# ONLY occurrence of that word in this table and steered the model straight
+# into the legacy property laravel13.md and backend.md ban. That closed a loop:
+# write $guarded = [] -> blocked, told to write $fillable -> write
+# protected $fillable -> nothing fires. The message now names the house form.
+GUARDED_EMPTY~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.php$~\$guarded\s*=\s*\[\s*\]~Declare an explicit #[Fillable([...])] attribute listing the columns this model accepts. An empty $guarded exposes every column, id and role columns included, to mass assignment. Exemplar packages/Webkul/AiAgent/src/Models/Credential.php.
+
+# LEGACY_MODEL_PROPERTY. House model style is PHP attributes plus a casts()
+# method; the declared-property spelling is legacy. 12 lines over 9 files on
+# the wide sweep, every one of them known debt named in laravel13.md
+# (Product AssociationType*, ProductAssociation, HistoryControl History,
+# AdminApi Apikey) and free under the ratchet. Migrations and seeders are
+# excluded: a schema file legitimately names tables and columns.
+LEGACY_MODEL_PROPERTY~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.|/Database/(Migrations?|Seeders)/)).*/Models/.*\.php$~^\s*protected\s+\$(fillable|casts|table|hidden)\s*=~House model style is PHP attributes plus a casts() method: #[Fillable([...])], #[Hidden([...])], #[Table(name: '...')] and protected function casts(): array. Exemplar packages/Webkul/AiAgent/src/Models/Credential.php.
+
+# RAW_SQL_INTERPOLATION replaces DB_RAW_INTERPOLATION, which recognised the
+# token DB::raw( and nothing else. whereRaw, selectRaw, orderByRaw and
+# havingRaw carrying a directly interpolated request value were all invisible,
+# and so was the injectable fragment this codebase's search boxes actually
+# produce: LIKE '%$search%', which the old [^"']* class could not reach across
+# the inner quote. The value-position requirement is KEPT verbatim -- after =,
+# < , >, LIKE or IN ( -- because it is what holds the false positives at zero.
+#
+# Measured 0 hits. It was validated in both directions rather than by count
+# alone: 7 of 7 on a must-catch corpus (LIKE with and without braces, id = $id,
+# DB::raw nested inside whereRaw, havingRaw with COUNT), and 0 of 10 on a
+# must-NOT corpus built from the shapes the old rule was narrowed to avoid --
+# whereRaw("COALESCE($searchPath, '') = ''") and whereRaw("$column IS NULL")
+# from the Product database filters (10 real lines in core),
+# DB::raw($this->axisCodesSubQuery('level_1').' as level_1_axes'),
+# DB::raw("{$jsonExpr} as attr_value"), the rawQueryGrammar and $prefix
+# fragments, and the bound whereRaw('col = ?', [$value]).
+#
+# KNOWN RESIDUAL, deliberate: orderByRaw("$column $direction") is NOT caught.
+# It is character-for-character the shape of whereRaw("$column IS NULL"), which
+# is correct code in five core filter classes, so no line-level regex can
+# separate a whitelisted sort column from a request-supplied one. DataGrid sort
+# handlers are a review dimension (unopim-code-review section 6), not an exit
+# code. selectRaw("CONCAT(name, '$search')") and DB::raw(sprintf(...)) are out
+# for the same reason the old rule documented: laundered through a helper.
+RAW_SQL_INTERPOLATION~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.php$~(?:whereRaw|selectRaw|orderByRaw|havingRaw|DB::raw)\(\s*["'][^"']*(?:=|<|>|\bLIKE\b|\bIN\b\s*\()\s*['"%]*\s*[.{]?\s*\$~Bind the value instead of interpolating it into the SQL: whereRaw('col = ?', [$value]), or a query builder method. A SQL fragment built from an internal column path, from $prefix or from DB::rawQueryGrammar() is not this rule.
+
+# --- Uploads -----------------------------------------------------------
+# UPLOAD_SCRIPT_CARRIER is the flattest ban in security.md: svg and html are
+# script carriers and must never be an accepted upload extension. 14 hits, all
+# genuine and all a one-word deletion -- twelve DataTransfer import validators
+# allowing html beside csv, and two image requests allowing svg.
+UPLOAD_SCRIPT_CARRIER~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.php$~mimes:[a-z0-9,]*\b(?:svg|html?|xml|phtml|php)\b~svg, html and xml are script carriers and must never be an accepted upload extension. Drop them from the mimes list.
+
+# UPLOAD_UNRESTRICTED catches the upload that passes every other gate: it uses
+# a FormRequest, so INLINE_VALIDATE is satisfied, and its only rule is 'file'.
+# The rule token must be QUOTED inside a rules array -- an unquoted \b(file|
+# image)\b also matched the MIME map 'png' => 'image/png' in
+# PublicationAssetController, 3 false positives for 1 real one. 1 hit after
+# that anchor: ChatController's 'files.*' => ['file', 'max:102400', ...], which
+# checks the type in a closure instead of an allowlist.
+UPLOAD_UNRESTRICTED~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*(Http/Requests/|Http/Controllers/).*\.php$~^(?!.*mimes:).*=>\s*\[[^]]*["'](?:file|image)["']~An upload rule needs an extension allowlist, a size cap and a MIME match: mimes:csv,xlsx plus max:10240 plus new FileMimeExtensionMatch. Exemplar packages/Webkul/Core/src/Rules/FileMimeExtensionMatch.php.
+
+# --- Scale -------------------------------------------------------------
+# 0 baseline hits: the static-facade veto list already covers every ::all()
+# the core actually calls, and ->all() on a collection can never match because
+# the regex demands a ClassName:: prefix.
+#
+# The veto list now carries the SMALL ENTITIES too. scale.md:31 permits all()
+# for attributes, categories, families and the config-shaped tables, so
+# Channel::all() and Locale::all() -- three to twenty rows, the idiomatic
+# lookup -- were code the rule blocked and the doc blessed. Still 0 hits; the
+# widening only removes a latent false positive that fires the first time an
+# agent writes the correct thing.
+MODEL_ALL~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.php$~\b(?!(Config|Cache|Session|Request|Cookie|Auth|Arr|Str|Route|Storage|View|Lang|App|Schema|Channel|Locale|Currency|Theme|Role|AttributeFamily|AttributeGroup)::)[A-Z][A-Za-z0-9_]*::all\(\)~Unbounded reads do not scale to a catalogue of millions. Use paginate(), chunkById(), lazyById(), or a repository method that limits the set.
+
+# REPO_ALL is the largest hole MODEL_ALL left. Its regex demands a ClassName::
+# prefix, so $this->productRepository->all() -- the same catalogue-wide read,
+# written the way AGENTS.md and every skill file tell an agent to write it --
+# walked straight through, and an agent blocked once by MODEL_ALL learns that
+# spelling on the retry.
+#
+# The small-entity names carry the same veto as MODEL_ALL, and here it is
+# load-bearing rather than latent: unvetoed the rule fired 24 times over 16
+# files and almost every hit was $this->localeRepository->all(),
+# $this->channelRepository->all() or $this->currencyRepository->all() in Core
+# and the product validators -- exactly what scale.md:31 permits. 2 hits
+# remain, one of them the genuine target ($productRepository->all() in
+# AiAgent/src/Examples).
+#
+# $this->model->all() is deliberately NOT part of this rule. It measured 3
+# hits, all 3 inside the attribute, family and category repositories, where
+# the entity is small and the call is correct -- 100% false positive. At a
+# $this->model call site the entity name is invisible; at a repository call
+# site it is in the variable, which is why the judgment lives here.
+REPO_ALL~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.php$~\$(?:this->)?(?!(?i:locale|currency|channel|theme|role|attribute|attributeFamily|attributeGroup|attributeOption|family|group)[Rr]epository\b)[A-Za-z0-9_]*[Rr]epositor(?:y|ies)->all\(\)|Repository::class\s*\)->all\(\)~A repository all() is the same unbounded read as Model::all(). Use paginate(), chunkById(), lazyById(), or a repository method that limits the set.
+
+# SELECT_STAR: 0 hits. Core never writes it, and it is the one purely
+# mechanical piece of performance.md:73 a single line can carry.
+SELECT_STAR~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.php$~->select\(\s*['"]\*['"]\s*\)~select() only the columns the code reads. A select('*') on a catalogue table pulls every column into memory for rows that never use them.
+
+# NOT ENFORCED HERE, on purpose. These four were measured and rejected; the
+# numbers are recorded so the next reader does not re-propose them.
+#   N+1 in a loop, and a missing eager load. grep-gate matches a PCRE against
+#       added lines with no block or scope awareness, so it cannot know a
+#       ->count() sits inside a foreach. Genuinely not a line property.
+#   An unbounded fluent ->get() on a catalogue table. Reaching it needs the
+#       added lines re-joined into statements; the proposed rule measured 70
+#       hits over 56 files that way, and they were ProductProxy::observe(),
+#       Product::class and ProductProxy::modelClass() -- the joined buffer
+#       glues docblocks and class bodies into one "statement", so the shape
+#       stops meaning anything.
+#   Bulk work inline in a controller. The proposed proxy flagged
+#       ->chunkById( and ->lazyById( inside Http/Controllers, which are the
+#       RECOMMENDED streaming primitives: its only hit in core was a correct
+#       $product->variants()->lazyById(). A rule that flags the fix teaches
+#       the wrong lesson.
+#   A singleton holding request state. $this->app->singleton( measures 29 hits
+#       across Core, Product, Attribute and Webhook, and performance.md:63
+#       says singleton is CORRECT for stateless registries.
+# All four are review dimensions in skills/unopim-code-review, sections 5
+# and 6, and named as unhooked in performance.md and scale.md.
+
+# --- Localization ------------------------------------------------------
+HARDCODED_ATTR~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.(blade\.php|vue)$~\s(placeholder|title|label|alt)="[A-Z]~Wrap it in trans('package::file.key'), add the key to en_US, and propagate the translated value to all 33 locales.
+HARDCODED_OPTION~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.blade\.php$~<option[^>]*>\s*[A-Z]~Build the options from trans() values in the controller, or pass them as the select component's options payload.
+
+# BLADE_TEXT_NODE: the old ^\s*[A-Z][a-z]+\s[a-z]+ branch matched ANY indented
+# English sentence, so all 12 baseline hits were prose inside {{-- --}} header
+# comments -- grep cannot see that it is inside a block comment. The bare-line
+# branch now has to be the WHOLE line and at most five words, which is the
+# shape of a label and not the shape of a wrapped comment sentence. Cost: a
+# hardcoded full sentence broken across lines inside a <p> is no longer
+# caught. 12 false positives -> 0, and it now finds 2 real ones (the
+# accordion's "Default Header" / "Default Content" slot placeholders). 12 -> 2.
+BLADE_TEXT_NODE~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.blade\.php$~(>\s*[A-Z][a-z]+\s+[a-z]+\b|^\s*[A-Z][a-z]+(\s+[A-Za-z']+){1,4}\s*$)~Move the sentence into a translation key and echo trans('package::file.key'). Bare text in markup cannot be localized.
+
+# --- CRUD page patterns ------------------------------------------------
+# The trailing ['"] anchors "create" to the end of the route path, so
+# Route::get('exports/{id}/create-mapping') is not a create page.
+GET_CREATE_ROUTE~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*Routes/.*\.php$~Route::get\(\s*['"][^'"]*create['"]~Create is a code and label modal on the index page, and store() redirects to the edit page. Drop the GET create route and its page.
