@@ -74,11 +74,17 @@ app_service() {
     ' "$1"
 }
 
+# A running container outranks a host binary: a machine can have both, and the
+# host php then has the wrong extensions and no route to the compose network.
 WRAPPER="php"
-if ! command -v php >/dev/null 2>&1; then
-    if COMPOSE="$(compose_file)"; then
-        SERVICE="$(app_service "$COMPOSE")"
-        [ -n "$SERVICE" ] || SERVICE="app"
+if COMPOSE="$(compose_file)"; then
+    SERVICE="$(app_service "$COMPOSE")"
+    [ -n "$SERVICE" ] || SERVICE="app"
+    # The wrapper is word-split by its consumers, so it stays free of paths.
+    if command -v docker >/dev/null 2>&1 \
+        && [ -n "$(docker compose -f "$COMPOSE" ps -q "$SERVICE" 2>/dev/null)" ]; then
+        WRAPPER="docker compose exec -T $SERVICE php"
+    elif ! command -v php >/dev/null 2>&1; then
         WRAPPER="docker compose exec -T $SERVICE php"
     fi
 fi
