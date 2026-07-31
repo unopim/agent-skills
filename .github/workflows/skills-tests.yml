@@ -18,12 +18,18 @@ jobs:
       # Exemplar-path linting needs a real UnoPim tree. A network or upstream
       # failure here must not fail the build: the lint step below falls back to
       # running without --unopim and annotates the run instead.
+      #
+      # The ref is pinned: these skills document the master line, and the
+      # repository default points at the previous release, whose tree is missing
+      # packages the skills cite. Leaving it unpinned fails every cited path
+      # added since that release.
       - name: Check out UnoPim for exemplar-path validation
         id: unopim
         continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: unopim/unopim
+          ref: master
           path: .unopim
           persist-credentials: false
 

@@ -12,6 +12,10 @@ bin/lint-skills.sh                    # add --unopim <path-to-unopim-checkout> t
 skills/tests/run-tests.sh
 ```
 
+The checkout must be on `master`. These skills document that line, and without
+`--unopim` the citation check skips silently rather than failing — so a run that
+prints `skills lint clean` with no checkout has not verified a single path.
+
 ## 1. The dividing line: judgment vs mechanics
 
 A rule that a regex can decide belongs in `hooks/rules.txt`, where it produces an exit code.
