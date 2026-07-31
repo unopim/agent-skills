@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Git pre-commit bridge: runs the same grep ratchet over every staged file, so
+# humans and non-Claude agents get the identical gate. Exit non-zero blocks the
+# commit. Silent and exit 0 when the checkout has no installed gate.
+set -uo pipefail
+
+TOP="$(git rev-parse --show-toplevel 2>/dev/null)"
+[ -n "$TOP" ] || exit 0
+
+GATE="$TOP/.claude/hooks/grep-gate.sh"
+[ -x "$GATE" ] || exit 0
+
+FILES="$(git diff --cached --name-only --diff-filter=ACM)"
+[ -n "$FILES" ] || exit 0
+
+STATUS=0
+while IFS= read -r file; do
+    [ -n "$file" ] || continue
+    [ -f "$TOP/$file" ] || continue
+    case "$file" in
+        *'"'*|*'\'*) continue ;;
+    esac
+    printf '{"tool_input":{"file_path":"%s"}}' "$TOP/$file" | "$GATE" || STATUS=1
+done <<EOF
+$FILES
+EOF
+
+if [ "$STATUS" -ne 0 ]; then
+    {
+        echo
+        echo "Commit blocked: the staged changes add standards violations listed"
+        echo "above. Fix the added lines — pre-existing violations elsewhere in"
+        echo "those files are not your problem. Commit with --no-verify only for"
+        echo "a reason you can state."
+    } >&2
+fi
+
+exit "$STATUS"

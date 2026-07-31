@@ -1,45 +1,39 @@
 ---
 name: unopim-datagrid
-description: "Implement Unopim DataGrid classes for listing records in admin panels with search, filter, sort, actions (edit/delete), and mass actions. Covers DataGrid subdirectory structure (DataGrids/Section/), prepareQueryBuilder with DB::table (prefix added by Laravel), addColumn with correct closure patterns, addAction with function callbacks for url, addMassAction, bouncer() permission checks, and Blade integration. Use this skill when creating a DataGrid for credentials, mappings, export history, or any Unopim module listing page."
-license: MIT
-metadata:
-  author: unopim
-  tags: [unopim, datagrid, laravel, admin, listing, connector, integration]
+description: Use when building or changing an UnoPim admin listing page — a DataGrid class with columns, search, filters, sorting, row actions or mass actions, or the Blade view that renders it. Trigger phrases include "datagrid", "admin listing", "add a column", "mass action", "prepareQueryBuilder", "listing page".
+requires: unopim-standards, unopim-verify
 ---
 
-# Unopim DataGrid
+# UnoPim DataGrid
 
-## Overview
+Copy shape from these exemplars — never invent engine API:
 
-All DataGrid patterns are derived from the WooCommerce connector reference:
-`DataGrids/Credential/CredentialDataGrid.php`.
+- Grid class: `packages/Webkul/AiAgent/src/DataGrids/Credential/CredentialDataGrid.php`
+- Mass actions: `packages/Webkul/Admin/src/DataGrids/Catalog/ProductDataGrid.php`
+- Listing Blade: `packages/Webkul/Webhook/src/Resources/views/webhooks/index.blade.php`
+- Raw SQL with prefix: `packages/Webkul/Measurement/src/DataGrids/UnitDataGrid.php`
 
-**Critical rules:**
-- DataGrid lives in a **subdirectory**: `DataGrids/{Section}/{Name}DataGrid.php`
-- Methods use **PHPDoc `@return`** only — no PHP return type hints on methods
-- `closure` callbacks in columns use PHP arrow functions `fn ($row) =>`
-- `url` callbacks in actions use **regular function**: `function ($row) { return ...; }`
-- Table names without prefix in DB::table() — Laravel adds DB_PREFIX
-- Use `bouncer()->hasPermission()` for action permission checks
-- Status badges: `class="label-active"` (true) and `class="label-info text-gray-600 dark:text-gray-300"` (false)
-- **Comments:** match Laravel core — no inline comments that narrate what the code does. The closure/url/permission patterns above are documented in this skill, not repeated as comments in generated code. Comment only a non-obvious _why_, one line.
+## Rules
 
-**Admin UI rule (critical):**
-- If the listing page includes form/filter controls in Blade, use UnoPim form components.
-- Do not generate raw `<select>`, `<input>`, `<textarea>`, or `<label>` controls when `x-admin::form.*` components exist.
-- Keep labels/placeholders/messages in translations.
+- Grid lives in a subdirectory — `src/DataGrids/{Section}/{Name}DataGrid.php` — and extends `Webkul\DataGrid\DataGrid`.
+- `prepareQueryBuilder()` MUST use `DB::table()` with bare table names (no prefix — Laravel applies `env('DB_PREFIX', '')`). NEVER query Eloquent models here.
+- Any raw fragment (`selectRaw`, `whereRaw`, `orderByRaw`, `DB::raw`) that names a table MUST prepend `DB::getTablePrefix()` — see `packages/Webkul/Measurement/src/DataGrids/UnitDataGrid.php`. MySQL and PostgreSQL both run in CI: no MySQL-only SQL (GROUP_CONCAT, backticks, DATE_FORMAT).
+- `addColumn()` MUST set all six keys — `index`, `label`, `type`, `searchable`, `filterable`, `sortable`. The engine reads the three flags with no null-coalescing; omitting one throws "Undefined array key" at request time.
+- Hook signatures: the abstract base declares `prepareColumns()`/`prepareActions()` untyped, so PHPDoc-`@return`-only (older Admin grids) and `: void` (newest grids, including the Credential exemplar) both compile. Write `: void` in new code; match the existing style when editing. NEVER flag either style as a violation.
+- Action `url` accepts any callable — prefer `fn ($row): string => route(...)`. Mass-action `url` is a plain `route(...)` string, no callable.
+- Gate every action and mass action with `bouncer()->hasPermission()`. Mass-action ACL keys are snake_case (`{module-slug}.credentials.mass_delete`), matching the route names — NEVER hyphenated (`mass-delete`).
+- Column `closure` output renders as raw HTML; the engine `strip_tags()`-sanitizes plain string cells only. Any user-supplied value interpolated in closure HTML MUST be escaped with `e()`.
+- Every label and title uses `trans()` with keys added to `en_US` first, then all 33 locales. Boolean badges: `label-active` (true), `label-info text-gray-600 dark:text-gray-300` (false).
+- Zero comments inside method bodies or array literals. Method PHPDoc is a one-line imperative summary; `@return` only where there is no native return type.
 
----
-
-## 1. Class Structure
+## Grid class
 
 ```php
 <?php
-// src/DataGrids/Credential/CredentialDataGrid.php
-//                 ^^^^^^^^^ — always a subdirectory named after the entity
 
 namespace Webkul\{ModuleName}\DataGrids\Credential;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Webkul\DataGrid\DataGrid;
 
@@ -48,30 +42,18 @@ class CredentialDataGrid extends DataGrid
     /**
      * Prepare query builder.
      *
-     * @return \Illuminate\Database\Query\Builder
+     * @return Builder
      */
     public function prepareQueryBuilder()
     {
-        // Use DB::table() without prefix — never Eloquent model here
-        $queryBuilder = DB::table('{module}_credentials')
-            ->select(
-                'id',
-                'label',
-                'apiUrl',
-                'consumerKey',
-                'status',
-                'created_at',
-            );
-
-        return $queryBuilder;
+        return DB::table('{module}_credentials')
+            ->select('id', 'label', 'status', 'created_at');
     }
 
     /**
-     * Add columns.
-     *
-     * @return void
+     * Prepare columns.
      */
-    public function prepareColumns()
+    public function prepareColumns(): void
     {
         $this->addColumn([
             'index'      => 'label',
@@ -83,277 +65,86 @@ class CredentialDataGrid extends DataGrid
         ]);
 
         $this->addColumn([
-            'index'      => 'apiUrl',
-            'label'      => trans('{module-name}::app.credentials.datagrid.api-url'),
-            'type'       => 'string',
-            'searchable' => true,
-            'filterable' => true,
-            'sortable'   => true,
-        ]);
-
-        $this->addColumn([
-            'index'      => 'consumerKey',
-            'label'      => trans('{module-name}::app.credentials.datagrid.consumer-key'),
-            'type'       => 'string',
-            'searchable' => false,
-            'filterable' => false,
-            'sortable'   => false,
-        ]);
-
-        $this->addColumn([
             'index'      => 'status',
             'label'      => trans('{module-name}::app.credentials.datagrid.status'),
             'type'       => 'boolean',
-            'searchable' => true,
+            'searchable' => false,
             'filterable' => true,
-            'sortable'   => false,
-            'closure'    => fn ($row) => $row->status
-                ? '<span class="label-active">' . trans('admin::app.common.yes') . '</span>'
-                : '<span class="label-info text-gray-600 dark:text-gray-300">' . trans('admin::app.common.no') . '</span>',
+            'sortable'   => true,
+            'closure'    => fn ($row): string => $row->status
+                ? '<span class="label-active">'.trans('admin::app.common.yes').'</span>'
+                : '<span class="label-info text-gray-600 dark:text-gray-300">'.trans('admin::app.common.no').'</span>',
         ]);
     }
 
     /**
      * Prepare actions.
-     *
-     * @return void
      */
-    public function prepareActions()
+    public function prepareActions(): void
     {
         if (bouncer()->hasPermission('{module-slug}.credentials.edit')) {
             $this->addAction([
                 'icon'   => 'icon-edit',
-                'title'  => trans('admin::app.catalog.attributes.index.datagrid.edit'),
+                'title'  => trans('{module-name}::app.credentials.datagrid.edit'),
                 'method' => 'GET',
-                'url'    => function ($row) {
-                    return route('{module-slug}.credentials.edit', $row->id);
-                },
+                'url'    => fn ($row): string => route('{module-slug}.credentials.edit', $row->id),
             ]);
         }
 
         if (bouncer()->hasPermission('{module-slug}.credentials.delete')) {
             $this->addAction([
                 'icon'   => 'icon-delete',
-                'title'  => trans('admin::app.catalog.attributes.index.datagrid.delete'),
+                'title'  => trans('{module-name}::app.credentials.datagrid.delete'),
                 'method' => 'DELETE',
-                'url'    => function ($row) {
-                    return route('{module-slug}.credentials.destroy', $row->id);
-                },
+                'url'    => fn ($row): string => route('{module-slug}.credentials.destroy', $row->id),
             ]);
         }
     }
 
     /**
      * Prepare mass actions.
-     *
-     * @return void
      */
-    public function prepareMassActions()
+    public function prepareMassActions(): void
     {
-        if (bouncer()->hasPermission('{module-slug}.credentials.mass-delete')) {
+        if (bouncer()->hasPermission('{module-slug}.credentials.mass_delete')) {
             $this->addMassAction([
-                'title'   => trans('admin::app.catalog.attributes.index.datagrid.delete'),
+                'title'   => trans('{module-name}::app.credentials.datagrid.delete'),
                 'url'     => route('{module-slug}.credentials.mass_delete'),
                 'method'  => 'POST',
                 'options' => ['actionType' => 'delete'],
-            ]);
-        }
-
-        if (bouncer()->hasPermission('{module-slug}.credentials.mass-edit')) {
-            $this->addMassAction([
-                'title'  => trans('admin::app.catalog.products.index.datagrid.update-status'),
-                'url'    => route('{module-slug}.credentials.mass_update'),
-                'method' => 'POST',
-                'options' => [
-                    [
-                        'label' => trans('admin::app.catalog.products.index.datagrid.active'),
-                        'value' => true,
-                    ],
-                    [
-                        'label' => trans('admin::app.catalog.products.index.datagrid.disable'),
-                        'value' => false,
-                    ],
-                ],
             ]);
         }
     }
 }
 ```
 
----
+For a status mass update, copy the `options` array of label/value pairs from the `catalog.products.mass_update` block in `packages/Webkul/Admin/src/DataGrids/Catalog/ProductDataGrid.php`.
 
-## 2. Callback Patterns: closure vs url
-
-| Location | Function style | Why |
-|---|---|---|
-| `addColumn` `closure` key | Arrow function `fn ($row) =>` | Short rendering expression |
-| `addAction` `url` key | `function ($row) { return ...; }` | Must `return` the URL string |
-| `addMassAction` `url` key | Plain string `route(...)` | Static URL, no row context |
-
-### Column closure (arrow function OK):
-```php
-'closure' => fn ($row) => $row->status ? '<span class="label-active">Yes</span>' : '<span class="label-info ...">No</span>',
-```
-
-### Action URL (regular function required):
-```php
-'url' => function ($row) {
-    return route('{module-slug}.credentials.edit', $row->id);
-},
-```
-
-### Mass action URL (static — no function):
-```php
-'url' => route('{module-slug}.credentials.mass_delete'),
-```
-
----
-
-## 3. Controller Integration
+## Controller
 
 ```php
 public function index()
 {
     if (request()->ajax()) {
-        return app(CredentialDataGrid::class)->toJson();
+        return resolve(CredentialDataGrid::class)->toJson();
     }
 
     return view('{module-name}::credentials.index');
 }
 ```
 
----
+## Listing Blade
 
-## 4. Blade View
+`admin::layouts.master` and `@extends` do not exist — the admin layout is a component. Create is a modal on the index page whose `store()` redirects to edit (copy `v-create-webhook-form` from the Webhook exemplar); do not add a GET create page.
 
 ```blade
-{{-- resources/views/credentials/index.blade.php --}}
-@extends('admin::layouts.master')
+<x-admin::layouts>
+    <x-slot:title>
+        @lang('{module-name}::app.credentials.index.title')
+    </x-slot>
 
-@section('page_title')
-    {{ __( '{module-name}::app.credentials.index.title' ) }}
-@stop
+    <x-admin::layouts.page-header :title="trans('{module-name}::app.credentials.index.title')" />
 
-@section('content-wrapper')
-    <div class="flex flex-col gap-4 p-4">
-        <div class="flex items-center justify-between gap-4">
-            <p class="text-xl font-bold text-gray-800 dark:text-white">
-                {{ __(' {module-name}::app.credentials.index.title') }}
-            </p>
-
-            @if (bouncer()->hasPermission('{module-slug}.credentials.create'))
-                <a
-                    href="{{ route('{module-slug}.credentials.create') }}"
-                    class="primary-button"
-                >
-                    {{ __(' {module-name}::app.credentials.index.create-btn') }}
-                </a>
-            @endif
-        </div>
-
-        {{-- DataGrid component renders the table --}}
-        <x-admin::datagrid :src="route('{module-slug}.credentials.index')" />
-    </div>
-@stop
+    <x-admin::datagrid :src="route('{module-slug}.credentials.index')" />
+</x-admin::layouts>
 ```
-
----
-
-## 5. MappingDataGrid Example
-
-DataGrids for other entities follow the same pattern in their own subdirectory:
-
-```php
-<?php
-// src/DataGrids/Mapping/MappingDataGrid.php
-
-namespace Webkul\{ModuleName}\DataGrids\Mapping;
-
-use Illuminate\Support\Facades\DB;
-use Webkul\DataGrid\DataGrid;
-
-class MappingDataGrid extends DataGrid
-{
-    /**
-     * @return \Illuminate\Database\Query\Builder
-     */
-    public function prepareQueryBuilder()
-    {
-        return DB::table('{module}_mappings as m')
-            ->leftJoin('{module}_credentials as c', 'm.credential_id', '=', 'c.id')
-            ->select(
-                'm.id',
-                'm.sku',
-                'm.external_id',
-                'c.label as credential_label',
-                'm.created_at',
-            );
-    }
-
-    /**
-     * @return void
-     */
-    public function prepareColumns()
-    {
-        $this->addColumn([
-            'index'      => 'sku',
-            'label'      => trans('{module-name}::app.mappings.datagrid.sku'),
-            'type'       => 'string',
-            'searchable' => true,
-            'filterable' => true,
-            'sortable'   => true,
-        ]);
-
-        $this->addColumn([
-            'index'      => 'external_id',
-            'label'      => trans('{module-name}::app.mappings.datagrid.external-id'),
-            'type'       => 'string',
-            'searchable' => true,
-            'filterable' => true,
-            'sortable'   => true,
-        ]);
-
-        $this->addColumn([
-            'index'      => 'credential_label',
-            'label'      => trans('{module-name}::app.mappings.datagrid.credential'),
-            'type'       => 'string',
-            'searchable' => false,
-            'filterable' => false,
-            'sortable'   => false,
-        ]);
-    }
-
-    /**
-     * @return void
-     */
-    public function prepareActions()
-    {
-        if (bouncer()->hasPermission('{module-slug}.mappings.delete')) {
-            $this->addAction([
-                'icon'   => 'icon-delete',
-                'title'  => trans('admin::app.catalog.attributes.index.datagrid.delete'),
-                'method' => 'DELETE',
-                'url'    => function ($row) {
-                    return route('{module-slug}.mappings.destroy', $row->id);
-                },
-            ]);
-        }
-    }
-}
-```
-
----
-
-## 6. Checklist
-
-- [ ] DataGrid file location: `src/DataGrids/{Section}/{Name}DataGrid.php` (subdirectory)
-- [ ] Extends `Webkul\DataGrid\DataGrid`
-- [ ] Methods have PHPDoc `@return` only — no PHP return type hints on methods
-- [ ] `DB::table('{module}_...')` — table names without hardcoded prefix
-- [ ] Column `closure` uses arrow function `fn ($row) =>`
-- [ ] Action `url` uses regular `function ($row) { return route(...); }`
-- [ ] Mass action `url` is plain `route(...)` string (no function)
-- [ ] Boolean columns use `label-active` (true) and `label-info text-gray-600 dark:text-gray-300` (false)
-- [ ] Permission checks use `bouncer()->hasPermission()`
-- [ ] Controller calls `app(DataGridClass::class)->toJson()` for AJAX
-- [ ] Blade uses `<x-admin::datagrid :src="route(...)" />`

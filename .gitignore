@@ -1,2 +1,5 @@
 .DS_Store
 node_modules/
+
+# SDD working files, never committed
+.superpowers/
