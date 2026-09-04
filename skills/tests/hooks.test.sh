@@ -130,3 +130,37 @@ assert_passes bash -c 'grep -qx "http://example.test:8080" "$1/pw-env.txt"' _ "$
 
 rm -rf "$HOOKS_TMP"
 unset DETECT VERIFY HOOKS_TMP STUBBED gate
+
+# A Stop with no baseline cannot tell the session's work from the branch's, so
+# it must seed the baseline and pass rather than blame the whole tree.
+SWEEP="$REPO_ROOT/hooks/sweep-gate.sh"
+SWEEP_REPO="$(mktemp -d)"
+SWEEP_STATE="${TMPDIR:-/tmp}/unopim-sweep-sweepbaseline-"
+rm -f "$SWEEP_STATE"* 2>/dev/null
+
+git -C "$SWEEP_REPO" init -q
+git -C "$SWEEP_REPO" config user.email t@t.t
+git -C "$SWEEP_REPO" config user.name t
+mkdir -p "$SWEEP_REPO/packages/Webkul/Foo/src/Resources/views"
+printf 'seed\n' > "$SWEEP_REPO/seed.txt"
+git -C "$SWEEP_REPO" add -A
+git -C "$SWEEP_REPO" commit -qm seed
+printf '<div class="fixed inset-0">\n<input type="text" name="x">\n</div>\n' \
+    > "$SWEEP_REPO/packages/Webkul/Foo/src/Resources/views/edit.blade.php"
+
+sweep_stop() {
+    printf '{"session_id":"sweepbaseline","stop_hook_active":false}' \
+        | env CLAUDE_PROJECT_DIR="$SWEEP_REPO" "$SWEEP"
+}
+
+assert_passes sweep_stop
+assert_passes bash -c 'ls "$1"* >/dev/null 2>&1' _ "$SWEEP_STATE"
+
+printf '<div class="bg-purple-600">x</div>\n' \
+    >> "$SWEEP_REPO/packages/Webkul/Foo/src/Resources/views/edit.blade.php"
+assert_fails sweep_stop
+assert_output_contains "TAILWIND_INTENT" sweep_stop
+
+rm -rf "$SWEEP_REPO"
+rm -f "$SWEEP_STATE"* 2>/dev/null
+unset SWEEP SWEEP_REPO SWEEP_STATE
