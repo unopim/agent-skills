@@ -91,6 +91,8 @@ copy_if_present "$HERE/hooks/rules.txt" "$DEST/" "hooks/rules.txt — grep-gate 
 copy_if_present "$HERE/hooks/lib/payload.sh" "$DEST/lib/" "hooks/lib/payload.sh — the gates cannot read a hook payload without it"
 copy_if_present "$HERE/hooks/lib/added-lines.sh" "$DEST/lib/" "hooks/lib/added-lines.sh — grep-gate cannot see added lines without it"
 copy_if_present "$HERE/hooks/grep-gate.sh" "$DEST/" "hooks/grep-gate.sh — the ratchet itself"
+copy_if_present "$HERE/hooks/sweep-gate.sh" "$DEST/" "hooks/sweep-gate.sh — nothing catches a violation written by Bash"
+copy_if_present "$HERE/bin/skills-conformance-scan.sh" "$DEST/" "bin/skills-conformance-scan.sh — sweep-gate has no engine without it"
 copy_if_present "$HERE/skills/unopim-exec/detect-env.sh" "$DEST/" "skills/unopim-exec/detect-env.sh — the session card falls back to unknowns"
 
 chmod +x "$DEST"/*.sh 2>/dev/null || true
