@@ -140,6 +140,39 @@ A driver difference the grammar does not cover gets an explicit
 is a first-class CI target: run `vendor/bin/pest -c phpunit.pgsql.xml` after
 DB-touching work (via unopim-verify).
 
+### Three drivers, not two
+
+`config/database.php` ships `mysql`, `mariadb` and `pgsql`. Laravel reports
+MariaDB under its own driver name, so `DB::getDriverName()` returns the literal
+`mariadb` and never `mysql`. MariaDB has no CI matrix, so a branch that forgets
+it fails in production rather than in the suite.
+
+```php
+match ($driver) { 'mysql' => …, 'pgsql' => … }   // UnhandledMatchError on mariadb
+$driver === 'mysql' ? $a : $b                     // sends mariadb down the pgsql path
+in_array($driver, ['mysql', 'pgsql'], true)       // rejects mariadb
+```
+
+Group the family instead — `'mysql', 'mariadb' => …`, or
+`in_array($driver, ['mysql', 'mariadb'], true)`. Exemplars:
+`packages/Webkul/Core/src/Helpers/Database/GrammarQueryManager.php` (grammar
+selection), `packages/Webkul/DataTransfer/src/Helpers/Importers/Product/Importer.php`
+(bulk-mode session vars). When only PostgreSQL is special, test for that one and
+let the rest fall through: `=== 'pgsql'` is safe, `=== 'mysql'` is not.
+
+Singling out `mysql` is legitimate only once the family is already handled —
+`packages/Webkul/Installer/src/Helpers/Upgrade/BackupManager.php` passes
+`--no-tablespaces` to mysqldump alone, because MariaDB has no tablespace
+metadata and exits non-zero on the flag. That file also shows the two other
+client-level traps: MariaDB 11 renamed its binaries, so probe with
+`Symfony\Component\Process\ExecutableFinder` for `mariadb-dump` before falling
+back to the `mysqldump` shim, and pass credentials through the environment
+(`MYSQL_PWD`, `PGPASSWORD`) rather than argv, which is world-readable.
+
+`packages/Webkul/Core/tests/Unit/DatabaseDriverCoverageTest.php` fails any
+package file that branches on `'mysql'` without naming `mariadb`, so this is a
+suite failure and not only a review finding.
+
 ### Elasticsearch is optional
 
 `config('elasticsearch.enabled')` defaults to false. Every ES read needs a DB

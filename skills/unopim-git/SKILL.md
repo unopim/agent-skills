@@ -79,7 +79,7 @@ N/A — no UI change.
 - [x] `vendor/bin/pint --test` reports no style issues
 - [x] Tailwind classes are reordered
 - [x] New user-facing strings use translation keys (all 33 locales)
-- [x] Target branch is `master` (unless a maintainer requested a backport)
+- [x] Target branch is `3.x`, the current release line (`master` targets the next major)
 
 ## Documentation
 - [ ] My pull request requires an update on the documentation repository.
@@ -92,6 +92,18 @@ EOF
   but keep the heading with `N/A`.
 - Tick the Documentation box and describe what must change when docs are affected.
 - Only tick a Checklist box after actually running the command it names.
+
+## Release line — target `3.x`, not `master`
+
+`3.x` is the current release line and the default target for fixes; `master`
+carries the next major. Every workflow triggers on both branches
+(`on: [master, '3.x']`), so CI passing proves nothing about which one you
+targeted — check the PR's base branch yourself. The repository's own
+`PULL_REQUEST_TEMPLATE.md` states the same rule; when it and this skill
+disagree, the template wins.
+
+Older lines (`2.1`, `2.0`, `1.0`) exist and receive backports only when a
+maintainer asks for one.
 
 ## CI Gates — SIX gates on every push and PR
 
@@ -112,5 +124,5 @@ push with a failing gate and NEVER claim a PR is ready without the verify pass.
 ## Contributing Process
 
 - Security vulnerabilities: NEVER open a public GitHub issue — follow `SECURITY.md`.
-- Bug fixes: search existing issues first; fork, branch per issue, PR to `master`.
+- Bug fixes: search existing issues first; fork, branch per issue, PR to `3.x`.
 - Features: open a feature request issue before implementing.

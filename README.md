@@ -40,33 +40,53 @@ Use when reviewing UnoPim code changes or a pull request for standards complianc
 
 Use when creating an UnoPim branch, writing a commit message, or opening a pull request against the UnoPim repository. Trigger phrases include "branch", "commit", "commit message", "PR", "pull request", "changelog".
 
-### `unopim-dev-cycle` (deprecated)
-
-Use when running UnoPim tests, linting, static analysis, or asset builds, or when asked whether a change is ready to be called done. Trigger phrases include "run tests", "pest", "pint", "larastan", "phpstan", "playwright", "build assets", "is this done".
-
-Superseded by `unopim-exec` + `unopim-verify`; kept as a stub for one release, then removed.
-
 ## Install
 
-Install all skills from this repo into your AI agent:
+`skills` needs a subcommand — `npx skills unopim/agent-skills` on its own exits with
+`Unknown command: unopim/agent-skills`. Use `add`:
 
 ```bash
-npx skills unopim/agent-skills
+npx skills add unopim/agent-skills --all
 ```
 
-> **Note:** `npx skills unopim/unopim` installs nothing — the UnoPim application repository has no `skills/` directory. The skills ship from `unopim/agent-skills` only.
+`--all` is shorthand for `--skill '*' --agent '*' -y`: every skill, every detected agent,
+no prompts. A multi-agent install keeps one copy in `.agents/skills/` and symlinks it into
+each agent's own directory; a single-agent install writes straight into that agent's
+directory (`.claude/skills/`, `.cursor/skills/`, …). Add `-g` to install into the
+user-level directory instead, and `--copy` where a symlink out of the project tree does
+not resolve (containers, images).
+
+> **Note:** `npx skills add unopim/unopim` installs nothing — the UnoPim application repository has no `skills/` directory. The skills ship from `unopim/agent-skills` only.
+
+List what the repository ships without installing anything:
+
+```bash
+npx skills add unopim/agent-skills --list
+```
 
 Install a specific skill only:
 
 ```bash
-npx skills unopim/agent-skills --skill "unopim-plugin-development"
+npx skills add unopim/agent-skills --skill "unopim-plugin-development"
 ```
 
 Install for a specific agent:
 
 ```bash
-npx skills unopim/agent-skills -a claude-code
-npx skills unopim/agent-skills -a cursor
+npx skills add unopim/agent-skills -a claude-code -s '*' -y
+npx skills add unopim/agent-skills -a cursor -s '*' -y
+```
+
+Note that `npx skills add` does not resolve the `requires:` chain — asking for one skill
+installs exactly that skill. Name the dependencies yourself (`-s "unopim-plugin-development,unopim-standards,unopim-verify"`),
+or use `bin/install-skills.sh` below, which resolves them.
+
+Inspect and refresh an existing install:
+
+```bash
+npx skills list                  # what is installed, and where
+npx skills update -y             # update every installed skill to its latest version
+npx skills remove unopim-git     # remove one
 ```
 
 ### From a clone
@@ -103,6 +123,7 @@ paragraph and cannot rationalise past a non-zero exit.
 | `grep-gate.sh` | writing `*.php`, `*.blade.php`, `*.vue`, `*.js`, `*.css` | Raw `<input>`/`<select>`/`<textarea>`/`<label>` where an `x-admin::form` component belongs, a raw `<table>` or hand-rolled pagination where a DataGrid belongs, hand-rolled modal markup and `fixed inset-0` overlays, a new `.css`/`.scss`/`.less` file and colour literals inside a tracked one, `style="`, `<style>`, hex, short-hex and `rgb()` literals in Blade/Vue/JS *and* in markup built in PHP, arbitrary values (`bg-[#…]`, `bg-[rgb(…)]`), default intent scales, legacy `unopim-primary-*` classes, user-facing text without `trans()`, inline validation in all three spellings, `$guarded = []`, legacy `protected $fillable`/`$casts`/`$table` on a model, `whereRaw`/`selectRaw`/`DB::raw` with an interpolated value, uploads with no `mimes:` allowlist and `mimes:` lists containing `svg`/`html`, `Model::all()`, `$someRepository->all()`, `select('*')`, and any comment |
 | `i18n-gate.sh` | writing under `Resources/lang/**` | Any locale below 100% — the key must land in all 33 |
 | `verify-gate.sh` | a completion claim | Calling work done when PHP, Blade, JS or lang files changed since the verification gates last passed |
+| `sweep-gate.sh` | session start (`--baseline`) and a completion claim | Every rule in the table applied to all lines the session added, whatever wrote them — a file written by `sed -i`, a Bash redirect or a script never reaches the edit-time hooks, and a block message that was read but not acted on leaves the violation on disk. Baselines at session start so only what this session adds is reported |
 | `session-card.sh` | session start | Nothing — prints the resolved environment: container or host, port, database and Elasticsearch overrides |
 
 Every block names the rule, the fix, and the skill section that explains it.
@@ -146,9 +167,10 @@ All three run the same rule table, so an agent and a developer get the same answ
 ```
 agent-skills/
 ├── bin/
-│   ├── install-skills.sh        # skills into any agent, dependencies resolved
-│   ├── install-hooks.sh         # hooks + pre-commit into an UnoPim checkout
-│   └── lint-skills.sh           # the authoring standard, enforced
+│   ├── install-skills.sh              # skills into any agent, dependencies resolved
+│   ├── install-hooks.sh               # hooks + pre-commit into an UnoPim checkout
+│   ├── lint-skills.sh                 # the authoring standard, enforced
+│   └── skills-conformance-scan.sh     # the rule table over a diff or a tree
 ├── hooks/                       # the mechanical rules, shared by every install path
 ├── skills/
 │   ├── CONTRIBUTING.md          # the authoring standard, written down
@@ -160,7 +182,6 @@ agent-skills/
 │   ├── unopim-data-transfer/
 │   ├── unopim-code-review/
 │   ├── unopim-git/
-│   ├── unopim-dev-cycle/        # deprecation stub
 │   └── tests/
 ├── AGENTS.md                    # thin router into the skills
 ├── LICENSE

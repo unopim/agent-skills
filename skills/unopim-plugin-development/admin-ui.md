@@ -10,7 +10,7 @@
 
 ## Component-first (MANDATORY)
 
-~140 component blades live under `packages/Webkul/Admin/src/Resources/views/components/`.
+~160 component blades live under `packages/Webkul/Admin/src/Resources/views/components/`.
 Search there before writing any markup.
 
 - Wrap every field in `x-admin::form.control-group` with `.label`, `.control`, `.error`.
@@ -28,6 +28,15 @@ Search there before writing any markup.
 - Listing pages use `<x-admin::layouts>` + `<x-slot:title>` + `<x-admin::datagrid>`
   (exemplar: `packages/Webkul/AiAgent/Resources/views/credentials/index.blade.php`).
   `admin::layouts.master` and `@extends` DO NOT EXIST.
+- Media fields (image, file, gallery) render through `x-admin::media.image`,
+  `x-admin::media.files` and `x-admin::media.gallery` — never a hand-rolled
+  uploader. Serving a stored file back to the browser goes through the named
+  route `admin.media.download`
+  (`packages/Webkul/Admin/src/Http/Controllers/MediaController.php`), which
+  authorizes the request against the root-to-permission map in
+  `packages/Webkul/Admin/src/Config/media.php`. A new downloadable root needs an
+  entry there or the download is refused; linking a storage path directly
+  bypasses the ACL entirely.
 - Every label, placeholder and message is a `trans()`/`@lang` key with `en_US` first.
 
 Select fields use the component select with an options payload:

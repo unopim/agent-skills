@@ -15,6 +15,44 @@ The installed checkout outranks these files: when the code in `$UNOPIM` disagree
 with a reference file, follow the checkout and report the drift so the skill can be
 regenerated — these documents are a fallback snapshot, not the source of truth.
 
+## Consistency first
+
+Before applying any rule below, read what the surrounding code already does —
+the sibling controller, the neighbouring DataGrid, the package's other
+repositories. UnoPim offers more than one valid way to do most things, and the
+right one is the one this package already uses. A second pattern for the same
+job costs more than a suboptimal first one. These rules are the default when no
+pattern exists yet, not a licence to convert code you happen to be editing.
+
+## How to apply
+
+1. Map the change to the reference files below, and read each mapped file before editing. Skip the unrelated ones.
+2. Read the sibling files and the exemplar each rule cites. Follow the exemplar, not a generic-Laravel alternative.
+3. Verify anything version-sensitive — a signature, a column, a component, a driver, a config key — against the checkout rather than recalling it (see below).
+4. Make the smallest coherent change. Additive and backward compatible; no drive-by refactors of untouched lines.
+5. Run the narrowest tests that cover the change, then the gates (unopim-verify).
+6. Re-read the diff against every rule you mapped in step 1.
+
+## Verify, do not recall
+
+These files are a snapshot; the checkout is the truth. Anything countable or
+version-bound — how many components exist, which drivers ship, which branch is
+the release line, what a base class's signature is — must be read, not
+remembered. Use the highest tier available and say which one you used; every
+tier is optional and the last one always works.
+
+| Tier | Available when | Use |
+|---|---|---|
+| UnoPim MCP | `unopim/mcp` is installed | `get_catalog_schema`, `get_database_schema`, `get_app_info`, `search_jobs` |
+| Laravel Boost | `laravel/boost` is installed | `search-docs`, `database-schema`, `application-info` |
+| Shell | always | `php artisan about`, `composer show --direct`, `git grep`, reading the file |
+
+Never make a tool a precondition. A rule that only works with an MCP server
+installed is a rule that does not work.
+
+When the checkout disagrees with a reference file, follow the checkout and
+report the drift so the skill can be regenerated.
+
 ## Comments
 
 No comments inside method bodies, object/array literals, or Blade markup — not even a one-line "why". A genuinely non-obvious rationale belongs in the class or method PHPDoc, or in the commit message. No narration, no section dividers, no banners. Laravel framework internals do use narrative inline comments; that is framework style, not app/package style, and not this codebase's.
