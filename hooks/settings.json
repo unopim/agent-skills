@@ -58,6 +58,14 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/sweep-gate.sh --baseline"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verify-gate.sh --baseline"
+          }
+        ]
       }
     ]
   }

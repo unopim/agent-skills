@@ -215,8 +215,22 @@ RAW_LISTING~^(?!.*(Resources/views/components/|Resources/views/(emails|public|er
 # Allowed and never matched: /** PHPDoc */ blocks and their " * " body lines,
 # PHP 8 attributes (#[Fillable]), URLs inside strings, and anything under a
 # tests directory or a .spec./.test. file, where a comment marks intent for a
-# reader who cannot see the assertion's purpose from its name.
-INLINE_COMMENT~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.(php|js|vue)$~(^|\s)//(?!.*(?:https?:|s3:|ftp:|file:))|^\s*/\*(?!\*)|\S\s+/\*(?!\*)|^\s*#(?!\[|!)~Delete it. UnoPim code carries no inline comments: rename the variable or extract a method until the line explains itself, and put a rationale worth keeping in the method PHPDoc.
+# reader who cannot see the assertion's purpose from its name. A rationale in
+# a Vue computed or a <script> block therefore goes in a /** */ block too —
+# there is no method PHPDoc to move it to, and the rule already permits one.
+#
+# Config files are handled by CONFIG_COMMENT below rather than here.
+INLINE_COMMENT~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.|/[Cc]onfig/[^/]*\.php$)).*\.(php|js|vue)$~(^|\s)//(?!.*(?:https?:|s3:|ftp:|file:))|^\s*/\*(?!\*)|\S\s+/\*(?!\*)|^\s*#(?!\[|!)~Delete it. UnoPim code carries no inline comments: rename the variable or extract a method until the line explains itself, and put a rationale worth keeping in the method PHPDoc.
+
+# CONFIG_COMMENT is INLINE_COMMENT minus the block-comment arm, because a
+# config array is the one place the "move it to the PHPDoc" escape hatch does
+# not exist: there is no method to attach one to, and the value being explained
+# is a literal. Laravel writes the rationale as a /* |--- */ banner and so does
+# UnoPim — 14 of the 53 package configs on master, `packages/Webkul/Admin/src/Config/acl.php`
+# and `packages/Webkul/Admin/src/Config/media.php` among them. Blocking that
+# shape would be blocking the house style. Narration still has no place here,
+# so // and # stay blocked.
+CONFIG_COMMENT~^(?!.*(/[Tt]ests?/)).*/[Cc]onfig/[^/]*\.php$~(^|\s)//(?!.*(?:https?:|s3:|ftp:|file:))|^\s*#(?!\[|!)~Delete it. A config value explains itself through its key and a /* |--- */ banner block, the way Laravel and the core package configs do. Line comments narrate; the banner documents.
 BLADE_COMMENT~^(?!.*(/[Tt]ests?/|\.spec\.|\.test\.)).*\.blade\.php$~\{\{--~Delete it. Blade markup carries no comments: name the section with a component or a variable, and put anything a maintainer must know in the PHPDoc of the code that feeds this view.
 
 # --- Validation and mass assignment ------------------------------------

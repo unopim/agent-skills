@@ -12,7 +12,20 @@ hi_pint() { hi_payload "$1" | "$REPO_ROOT/hooks/pint-gate.sh"; }
 hi_pint_garbage() { printf 'not json at all' | "$REPO_ROOT/hooks/pint-gate.sh"; }
 hi_pint_empty() { printf '' | "$REPO_ROOT/hooks/pint-gate.sh"; }
 hi_i18n() { hi_payload "$1" | "$REPO_ROOT/hooks/i18n-gate.sh"; }
-hi_verify() { CLAUDE_PROJECT_DIR="$1" "$REPO_ROOT/hooks/verify-gate.sh" </dev/null; }
+# verify-gate baselines what was already dirty on its first run, so a test that
+# wants a verdict has to establish that baseline first — the same two steps a
+# real session takes at SessionStart and then at Stop.
+hi_verify() {
+    printf '{"session_id":"hooksinstall","stop_hook_active":false}' \
+        | CLAUDE_PROJECT_DIR="$1" "$REPO_ROOT/hooks/verify-gate.sh" --baseline >/dev/null 2>&1
+    printf '{"session_id":"hooksinstall","stop_hook_active":false}' \
+        | CLAUDE_PROJECT_DIR="$1" "$REPO_ROOT/hooks/verify-gate.sh"
+}
+
+# The baseline is keyed on the session and the checkout, so a fixture reused
+# across cases has to start from a clean one or the first case's snapshot
+# decides the second's verdict.
+hi_verify_reset() { rm -f "${TMPDIR:-/tmp}"/unopim-verify-hooksinstall-* 2>/dev/null; return 0; }
 hi_verify_looping() {
     printf '{"stop_hook_active":true}' \
         | CLAUDE_PROJECT_DIR="$1" "$REPO_ROOT/hooks/verify-gate.sh"
@@ -173,10 +186,13 @@ print(count)
 }
 
 hi_installed_once() { [ "$(hi_command_count "$1" "$2")" = "1" ]; }
+hi_installed_twice() { [ "$(hi_command_count "$1" "$2")" = "2" ]; }
 
 assert_passes "$REPO_ROOT/bin/install-hooks.sh" "$HI_APP"
 assert_passes hi_json_ok "$HI_APP/.claude/settings.json"
-assert_passes hi_installed_once "$HI_APP/.claude/settings.json" verify-gate.sh
+# verify-gate is registered twice on purpose: --baseline at SessionStart and
+# the verdict at Stop.
+assert_passes hi_installed_twice "$HI_APP/.claude/settings.json" verify-gate.sh
 assert_passes hi_installed_once "$HI_APP/.claude/settings.json" pint-gate.sh
 assert_passes hi_installed_once "$HI_APP/.claude/settings.json" grep-gate.sh
 assert_output_contains "Bash(ls:*)" cat "$HI_APP/.claude/settings.json"
@@ -235,5 +251,14 @@ hi_cited_skills_exist() {
     [ "$missing" -eq 0 ]
 }
 assert_passes hi_cited_skills_exist
+
+# Re-running the installer must not register a command twice: Stop and
+# SessionStart entries carry no matcher, so a second run can land the same
+# command in a different slot and the hook fires twice per event.
+assert_passes "$REPO_ROOT/bin/install-hooks.sh" "$HI_APP"
+assert_passes hi_installed_twice "$HI_APP/.claude/settings.json" verify-gate.sh
+assert_passes hi_installed_twice "$HI_APP/.claude/settings.json" sweep-gate.sh
+assert_passes hi_installed_once "$HI_APP/.claude/settings.json" session-card.sh
+assert_passes hi_installed_once "$HI_APP/.claude/settings.json" grep-gate.sh
 
 rm -rf "$HI_TMP"

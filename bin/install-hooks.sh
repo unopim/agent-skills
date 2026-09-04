@@ -130,7 +130,25 @@ if not isinstance(hooks, dict):
 added = 0
 for event, entries in add.get("hooks", {}).items():
     bucket = hooks.setdefault(event, [])
+    # Dedupe across the whole event, not just the matching slot: Stop and
+    # SessionStart entries carry no matcher, so two registrations of the same
+    # command can land in different slots and both fire.
+    installed = {
+        hook.get("command")
+        for slot in bucket
+        if isinstance(slot, dict)
+        for hook in slot.get("hooks", [])
+        if isinstance(hook, dict)
+    }
     for entry in entries:
+        entry = json.loads(json.dumps(entry))
+        entry["hooks"] = [
+            h for h in entry.get("hooks", [])
+            if not (isinstance(h, dict) and h.get("command") in installed)
+        ]
+        if not entry["hooks"]:
+            continue
+        installed.update(h.get("command") for h in entry["hooks"])
         matcher = entry.get("matcher")
         slot = next(
             (e for e in bucket if isinstance(e, dict) and e.get("matcher") == matcher),

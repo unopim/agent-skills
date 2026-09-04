@@ -164,3 +164,38 @@ assert_output_contains "TAILWIND_INTENT" sweep_stop
 rm -rf "$SWEEP_REPO"
 rm -f "$SWEEP_STATE"* 2>/dev/null
 unset SWEEP SWEEP_REPO SWEEP_STATE
+
+# verify-gate must not demand verification for a branch that arrived dirty:
+# without a baseline it cannot tell the session's work from the branch's.
+VG="$REPO_ROOT/hooks/verify-gate.sh"
+VG_REPO="$(mktemp -d)"
+VG_STATE="${TMPDIR:-/tmp}/unopim-verify-verifybaseline-"
+rm -f "$VG_STATE"* 2>/dev/null
+
+git -C "$VG_REPO" init -q
+git -C "$VG_REPO" config user.email t@t.t
+git -C "$VG_REPO" config user.name t
+mkdir -p "$VG_REPO/src"
+printf 'seed\n' > "$VG_REPO/seed.txt"
+git -C "$VG_REPO" add -A
+git -C "$VG_REPO" commit -qm seed
+printf '<?php\n' > "$VG_REPO/src/Old.php"
+
+vg_stop() {
+    printf '{"session_id":"verifybaseline","stop_hook_active":false}' \
+        | env CLAUDE_PROJECT_DIR="$VG_REPO" "$VG"
+}
+
+assert_passes vg_stop
+assert_passes vg_stop
+assert_passes bash -c 'ls "$1"* >/dev/null 2>&1' _ "$VG_STATE"
+
+sleep 1
+printf '<?php\n' > "$VG_REPO/src/New.php"
+assert_fails vg_stop
+assert_output_contains "src/New.php" vg_stop
+
+rm -rf "$VG_REPO"
+rm -f "$VG_STATE"* 2>/dev/null
+unset VG VG_REPO VG_STATE
+
