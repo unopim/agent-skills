@@ -126,6 +126,10 @@ rm -f "$HI_REPO/.verify-stamp"
 assert_passes hi_card "$REPO_ROOT"
 assert_output_contains "UnoPim workspace" hi_card "$REPO_ROOT"
 assert_output_contains "php wrapper" hi_card "$HI_TMP/plain"
+mkdir -p "$HI_TMP/noboost/packages/Webkul"
+printf '<?php\n' > "$HI_TMP/noboost/artisan"
+assert_output_contains "Laravel Boost is required" hi_card "$HI_TMP/noboost"
+assert_output_contains "boost:install" hi_card "$HI_TMP/noboost"
 
 # --- settings.json ------------------------------------------------------------
 assert_passes hi_json_ok "$REPO_ROOT/hooks/settings.json"
@@ -140,7 +144,7 @@ done
 
 # --- script hygiene -----------------------------------------------------------
 for hi_script in hooks/pint-gate.sh hooks/i18n-gate.sh hooks/verify-gate.sh \
-    hooks/session-card.sh hooks/pre-commit bin/install-hooks.sh; do
+    hooks/session-card.sh hooks/pre-commit bin/install-hooks.sh bin/doctor.sh; do
     assert_passes hi_hygiene "$hi_script"
 done
 
@@ -160,7 +164,7 @@ hi_git_init "$HI_APP"
 mkdir -p "$HI_APP/.claude"
 printf '{\n  "permissions": {\n    "allow": ["Bash(ls:*)"]\n  }\n}\n' > "$HI_APP/.claude/settings.json"
 
-assert_passes "$REPO_ROOT/bin/install-hooks.sh" "$HI_APP" --with-git-hook
+assert_passes "$REPO_ROOT/bin/install-hooks.sh" "$HI_APP" --with-git-hook --skip-tooling
 assert_passes hi_json_ok "$HI_APP/.claude/settings.json"
 assert_passes test -f "$HI_APP/.claude/hooks/pint-gate.sh"
 assert_passes test -f "$HI_APP/.claude/hooks/i18n-gate.sh"
@@ -188,7 +192,7 @@ print(count)
 hi_installed_once() { [ "$(hi_command_count "$1" "$2")" = "1" ]; }
 hi_installed_twice() { [ "$(hi_command_count "$1" "$2")" = "2" ]; }
 
-assert_passes "$REPO_ROOT/bin/install-hooks.sh" "$HI_APP"
+assert_passes "$REPO_ROOT/bin/install-hooks.sh" "$HI_APP" --skip-tooling
 assert_passes hi_json_ok "$HI_APP/.claude/settings.json"
 # verify-gate is registered twice on purpose: --baseline at SessionStart and
 # the verdict at Stop.
@@ -255,10 +259,24 @@ assert_passes hi_cited_skills_exist
 # Re-running the installer must not register a command twice: Stop and
 # SessionStart entries carry no matcher, so a second run can land the same
 # command in a different slot and the hook fires twice per event.
-assert_passes "$REPO_ROOT/bin/install-hooks.sh" "$HI_APP"
+assert_passes "$REPO_ROOT/bin/install-hooks.sh" "$HI_APP" --skip-tooling
 assert_passes hi_installed_twice "$HI_APP/.claude/settings.json" verify-gate.sh
 assert_passes hi_installed_twice "$HI_APP/.claude/settings.json" sweep-gate.sh
 assert_passes hi_installed_once "$HI_APP/.claude/settings.json" session-card.sh
 assert_passes hi_installed_once "$HI_APP/.claude/settings.json" grep-gate.sh
+
+# Without --skip-tooling the installer ships doctor.sh and runs it with --fix
+hi_tool_bin="$HI_TMP/toolbin"
+mkdir -p "$hi_tool_bin"
+printf '#!/usr/bin/env bash\nprintf "composer %%s\\n" "$*" >> calls.log\nprintf %%s "{\\"packages-dev\\":[{\\"name\\":\\"laravel/boost\\"}]}" > composer.lock\n' > "$hi_tool_bin/composer"
+printf '#!/usr/bin/env bash\nprintf "php %%s\\n" "$*" >> calls.log\nprintf %%s "{\\"mcpServers\\":{\\"laravel-boost\\":{\\"command\\":\\"php\\",\\"args\\":[\\"artisan\\",\\"boost:mcp\\"]}}}" > .mcp.json\n' > "$hi_tool_bin/php"
+chmod +x "$hi_tool_bin/composer" "$hi_tool_bin/php"
+hi_tool_app="$HI_TMP/toolapp"
+mkdir -p "$hi_tool_app/packages/Webkul"
+printf '<?php\n' > "$hi_tool_app/artisan"
+hi_install_tooling() { PATH="$hi_tool_bin:$PATH" "$REPO_ROOT/bin/install-hooks.sh" "$1" </dev/null; }
+assert_passes hi_install_tooling "$hi_tool_app"
+assert_passes test -x "$hi_tool_app/.claude/hooks/doctor.sh"
+assert_passes grep -qF "artisan boost:install --mcp --guidelines --skills --no-interaction" "$hi_tool_app/calls.log"
 
 rm -rf "$HI_TMP"

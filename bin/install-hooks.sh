@@ -3,20 +3,25 @@
 #   TARGET/.claude/hooks/        the gates, their lib/ and the rule table
 #   TARGET/.claude/settings.json hook registration, merged not overwritten
 #   TARGET/.git/hooks/pre-commit optional, with --with-git-hook
+# Then runs bin/doctor.sh --fix against TARGET, which installs Laravel Boost and
+# its MCP server when missing (skip with --skip-tooling) and lists the recommended
+# Claude Code plugins that are absent. A required gap left after that exits 1.
 # Re-running is idempotent. Files this repo does not have yet are reported
 # and skipped rather than aborting the install.
 set -euo pipefail
 
 usage() {
-    echo "usage: install-hooks.sh TARGET_UNOPIM_PATH [--with-git-hook]"
+    echo "usage: install-hooks.sh TARGET_UNOPIM_PATH [--with-git-hook] [--skip-tooling]"
 }
 
 TARGET=""
 WITH_GIT_HOOK=0
+SKIP_TOOLING=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --with-git-hook) WITH_GIT_HOOK=1 ;;
+        --skip-tooling) SKIP_TOOLING=1 ;;
         -h|--help) usage; exit 0 ;;
         -*) printf 'unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
         *)
@@ -93,6 +98,7 @@ copy_if_present "$HERE/hooks/lib/added-lines.sh" "$DEST/lib/" "hooks/lib/added-l
 copy_if_present "$HERE/hooks/grep-gate.sh" "$DEST/" "hooks/grep-gate.sh — the ratchet itself"
 copy_if_present "$HERE/hooks/sweep-gate.sh" "$DEST/" "hooks/sweep-gate.sh — nothing catches a violation written by Bash"
 copy_if_present "$HERE/bin/skills-conformance-scan.sh" "$DEST/" "bin/skills-conformance-scan.sh — sweep-gate has no engine without it"
+copy_if_present "$HERE/bin/doctor.sh" "$DEST/" "bin/doctor.sh — the session card cannot report missing AI tooling"
 copy_if_present "$HERE/skills/unopim-exec/detect-env.sh" "$DEST/" "skills/unopim-exec/detect-env.sh — the session card falls back to unknowns"
 
 chmod +x "$DEST"/*.sh 2>/dev/null || true
@@ -206,4 +212,11 @@ if [ -n "$MISSING" ]; then
     } >&2
 fi
 
+TOOLING_STATUS=0
+if [ "$SKIP_TOOLING" -eq 0 ]; then
+    echo
+    bash "$HERE/bin/doctor.sh" "$TARGET" --fix || TOOLING_STATUS=$?
+fi
+
 echo "done. The gates judge only the lines an edit adds."
+exit "$TOOLING_STATUS"

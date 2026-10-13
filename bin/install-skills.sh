@@ -368,3 +368,8 @@ if [ "$FAILURES" -gt 0 ]; then
 fi
 
 ok "done"
+
+if [ -f ./artisan ] && [ -d ./packages/Webkul ]; then
+    printf '\n'
+    bash "$REPO_ROOT/bin/doctor.sh" "$PWD" || warn "Laravel Boost is required: run $REPO_ROOT/bin/doctor.sh --fix"
+fi

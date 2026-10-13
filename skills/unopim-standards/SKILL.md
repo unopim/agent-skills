@@ -1,6 +1,7 @@
 ---
 name: unopim-standards
 description: Use when writing or changing any UnoPim code — the canonical rules for Laravel 13 and PHP 8.4 idiom, security, performance, scale, extensibility, localization and comments. Trigger phrases include "best practice", "standards", "laravel 13", "security", "performance", "scalable", "localization", "comments".
+requires: unopim-setup
 ---
 
 # UnoPim Standards
@@ -38,17 +39,19 @@ pattern exists yet, not a licence to convert code you happen to be editing.
 These files are a snapshot; the checkout is the truth. Anything countable or
 version-bound — how many components exist, which drivers ship, which branch is
 the release line, what a base class's signature is — must be read, not
-remembered. Use the highest tier available and say which one you used; every
-tier is optional and the last one always works.
+remembered. Laravel Boost is the required baseline: its MCP server must be
+connected before you write code (unopim-setup; the session card reports a gap).
+Use the highest tier available and say which one you used.
 
 | Tier | Available when | Use |
 |---|---|---|
 | UnoPim MCP | `unopim/mcp` is installed | `get_catalog_schema`, `get_database_schema`, `get_app_info`, `search_jobs` |
-| Laravel Boost | `laravel/boost` is installed | `search-docs`, `database-schema`, `application-info` |
+| Laravel Boost | required — `laravel/boost` plus its `.mcp.json` entry | `search-docs`, `database-schema`, `database-query`, `application-info`, `last-error` |
 | Shell | always | `php artisan about`, `composer show --direct`, `git grep`, reading the file |
 
-Never make a tool a precondition. A rule that only works with an MCP server
-installed is a rule that does not work.
+Boost missing or disconnected is a stop: tell the user, point at
+`doctor.sh --fix` (unopim-setup), and do not substitute recall for it. The shell
+tier is for what Boost does not cover — reading UnoPim's own files and git history.
 
 When the checkout disagrees with a reference file, follow the checkout and
 report the drift so the skill can be regenerated.
