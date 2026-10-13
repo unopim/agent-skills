@@ -60,7 +60,7 @@ Both verified against the checkout at the time of writing:
   --memory-limit=2G`, so the level comes from the config and the description is
   simply wrong. Correct the description, not the config.
 - **One `excludePaths` entry matches nothing.** `phpstan.neon` excludes
-  `packages/*/src/Database/Migration/*` (singular). Fourteen packages ship
+  `packages/*/src/Database/Migration/*` (singular). Fifteen packages ship
   `src/Database/Migrations/` (plural), and the single `Database/Migration/`
   directory that does exist is not under `src/`. The intended exclusion has
   never applied, so migrations have been analysed all along — fix the pattern

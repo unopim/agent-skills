@@ -17,7 +17,7 @@ Review the lines the change ADDED or MODIFIED. Legacy violations on untouched li
 ### 1. Comment noise — the #1 developer complaint
 
 - ANY added comment inside a method body, object/array literal, route group, or Blade markup is a blocker — including one-line "why" comments, section dividers (`// Views`, `// ----`), and `{{-- --}}` narration.
-- The house baseline is zero: `packages/Webkul/Product/src/Repositories/ProductRepository.php` (18 methods) and `packages/Webkul/Product/src/Type/AbstractType.php` (988 lines) ship 0 inline comments.
+- The house baseline is zero: `packages/Webkul/Product/src/Repositories/ProductRepository.php` (20 methods) and `packages/Webkul/Product/src/Type/AbstractType.php` (918 lines) ship 0 inline comments.
 - A genuinely non-obvious rationale belongs in the class/method PHPDoc or the commit message. Method PHPDoc: one-line imperative summary; `@param`/`@return` only where no native type hint exists.
 - Mechanical sweep: every `git diff -U0` added line matching `^\+\s*(//|/\*|\{\{--)` is a finding.
 

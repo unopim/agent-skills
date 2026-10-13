@@ -6,6 +6,7 @@
 - Contract interface
 - Repository
 - Events
+- Console commands
 - Container bindings — Octane safety
 - Scale rules (catalog tables hold millions of rows)
 
@@ -129,6 +130,18 @@ class SettingRepository extends Repository
   `Event::listen('catalog.product.create.after', [ProductEventListener::class, 'afterCreate']);`
   (exemplar: `packages/Webkul/AiAgent/src/Providers/AiAgentServiceProvider.php`).
 - Fire both `.before` and `.after` around any state change your module exposes to others.
+
+## Console commands
+
+Declare the signature and description as class attributes —
+`#[Signature('vendor:module:action {--option= : help}')]` and `#[Description('…')]` from
+`Illuminate\Console\Attributes` (exemplar:
+`packages/Webkul/Completeness/src/Console/RecalculateCompletenessCommand.php`). The
+attribute form is the majority style; a few legacy commands still use
+`protected $signature` — do not copy them. Register with
+`$this->commands([...])` inside `if ($this->app->runningInConsole())`. A command that
+walks products or other catalog rows dispatches batched jobs rather than looping
+inline (same exemplar, `BATCH_SIZE`).
 
 ## Container bindings — Octane safety
 

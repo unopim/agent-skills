@@ -192,6 +192,15 @@ skeleton). `config('app.php')` has NO providers array — do not send agents the
 Webkul\{ModuleName}\Providers\{ModuleName}ServiceProvider::class,
 ```
 
+Then list the `ModuleServiceProvider` in the `modules` array of `config/concord.php`.
+Every first-party package with models is listed there, including those whose service
+provider also calls `$this->app->register(ModuleServiceProvider::class)`
+(`packages/Webkul/AiAgent/src/Providers/AiAgentServiceProvider.php`) — follow suit.
+
+```php
+Webkul\{ModuleName}\Providers\ModuleServiceProvider::class,
+```
+
 ## Menu config
 
 Exemplar: `packages/Webkul/AiAgent/Config/menu.php`. Flat entries; sub-items nest by

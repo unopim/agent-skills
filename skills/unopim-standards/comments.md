@@ -62,9 +62,9 @@ hook is still a review blocker.
 
 The exemplar files are literally zero:
 
-- `packages/Webkul/Product/src/Repositories/ProductRepository.php` — 18 methods,
-  325 lines, **0 inline comments**.
-- `packages/Webkul/Product/src/Type/AbstractType.php` — 988 lines,
+- `packages/Webkul/Product/src/Repositories/ProductRepository.php` — 20 methods,
+  469 lines, **0 inline comments**.
+- `packages/Webkul/Product/src/Type/AbstractType.php` — 918 lines,
   **0 inline comments**.
 
 Codebase-wide it is low but not zero, and you should know the real number rather
