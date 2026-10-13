@@ -1,6 +1,7 @@
 ---
 name: unopim-standards
 description: Use when writing or changing any UnoPim code — the canonical rules for Laravel 13 and PHP 8.4 idiom, security, performance, scale, extensibility, localization and comments. Trigger phrases include "best practice", "standards", "laravel 13", "security", "performance", "scalable", "localization", "comments".
+requires: unopim-setup
 ---
 
 # UnoPim Standards
@@ -14,6 +15,46 @@ these files spend their words on the calls that need a model's judgment.
 The installed checkout outranks these files: when the code in `$UNOPIM` disagrees
 with a reference file, follow the checkout and report the drift so the skill can be
 regenerated — these documents are a fallback snapshot, not the source of truth.
+
+## Consistency first
+
+Before applying any rule below, read what the surrounding code already does —
+the sibling controller, the neighbouring DataGrid, the package's other
+repositories. UnoPim offers more than one valid way to do most things, and the
+right one is the one this package already uses. A second pattern for the same
+job costs more than a suboptimal first one. These rules are the default when no
+pattern exists yet, not a licence to convert code you happen to be editing.
+
+## How to apply
+
+1. Map the change to the reference files below, and read each mapped file before editing. Skip the unrelated ones.
+2. Read the sibling files and the exemplar each rule cites. Follow the exemplar, not a generic-Laravel alternative.
+3. Verify anything version-sensitive — a signature, a column, a component, a driver, a config key — against the checkout rather than recalling it (see below).
+4. Make the smallest coherent change. Additive and backward compatible; no drive-by refactors of untouched lines.
+5. Run the narrowest tests that cover the change, then the gates (unopim-verify).
+6. Re-read the diff against every rule you mapped in step 1.
+
+## Verify, do not recall
+
+These files are a snapshot; the checkout is the truth. Anything countable or
+version-bound — how many components exist, which drivers ship, which branch is
+the release line, what a base class's signature is — must be read, not
+remembered. Laravel Boost is the required baseline: its MCP server must be
+connected before you write code (unopim-setup; the session card reports a gap).
+Use the highest tier available and say which one you used.
+
+| Tier | Available when | Use |
+|---|---|---|
+| UnoPim MCP | `unopim/mcp` is installed | `get_catalog_schema`, `get_database_schema`, `get_app_info`, `search_jobs` |
+| Laravel Boost | required — `laravel/boost` plus its `.mcp.json` entry | `search-docs`, `database-schema`, `database-query`, `application-info`, `last-error` |
+| Shell | always | `php artisan about`, `composer show --direct`, `git grep`, reading the file |
+
+Boost missing or disconnected is a stop: tell the user, point at
+`doctor.sh --fix` (unopim-setup), and do not substitute recall for it. The shell
+tier is for what Boost does not cover — reading UnoPim's own files and git history.
+
+When the checkout disagrees with a reference file, follow the checkout and
+report the drift so the skill can be regenerated.
 
 ## Comments
 

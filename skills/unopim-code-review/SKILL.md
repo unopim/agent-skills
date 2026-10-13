@@ -17,7 +17,7 @@ Review the lines the change ADDED or MODIFIED. Legacy violations on untouched li
 ### 1. Comment noise — the #1 developer complaint
 
 - ANY added comment inside a method body, object/array literal, route group, or Blade markup is a blocker — including one-line "why" comments, section dividers (`// Views`, `// ----`), and `{{-- --}}` narration.
-- The house baseline is zero: `packages/Webkul/Product/src/Repositories/ProductRepository.php` (18 methods) and `packages/Webkul/Product/src/Type/AbstractType.php` (988 lines) ship 0 inline comments.
+- The house baseline is zero: `packages/Webkul/Product/src/Repositories/ProductRepository.php` (20 methods) and `packages/Webkul/Product/src/Type/AbstractType.php` (918 lines) ship 0 inline comments.
 - A genuinely non-obvious rationale belongs in the class/method PHPDoc or the commit message. Method PHPDoc: one-line imperative summary; `@param`/`@return` only where no native type hint exists.
 - Mechanical sweep: every `git diff -U0` added line matching `^\+\s*(//|/\*|\{\{--)` is a finding.
 
@@ -31,7 +31,7 @@ Review the lines the change ADDED or MODIFIED. Legacy violations on untouched li
 
 - Raw `<input>`, `<select>`, `<textarea>`, `<label>` in admin views = blocker: `x-admin::form.control-group` + `.label`/`.control`/`.error` exist.
 - Hand-built listing tables = blocker: use `x-admin::datagrid`. Custom fixed/backdrop divs = blocker: use `x-admin::modal` (+ `modal.confirm`) or `x-admin::drawer`.
-- ~140 component blades live under `packages/Webkul/Admin/src/Resources/views/components` — check there before accepting hand-rolled markup (switcher, flat-picker, tinymce, tabs, accordion, dropdown, tree, badge, shimmer).
+- ~160 component blades live under `packages/Webkul/Admin/src/Resources/views/components` — check there before accepting hand-rolled markup (switcher, flat-picker, tinymce, tabs, accordion, dropdown, tree, badge, shimmer).
 - Selects use `:options="json_encode(...)"` with `track-by`/`label-by` — never `@foreach` over `<option>`.
 
 ### 4. Duplication
@@ -51,6 +51,7 @@ Review the lines the change ADDED or MODIFIED. Legacy violations on untouched li
 
 - Raw SQL fragments (`DB::raw`, `selectRaw`, `whereRaw`, `orderByRaw`) naming tables must prepend `DB::getTablePrefix()` (`packages/Webkul/Measurement/src/DataGrids/UnitDataGrid.php`). Hardcoded `wk_` = blocker — no such prefix exists; `DB_PREFIX` defaults to empty.
 - MySQL-only SQL (GROUP_CONCAT, backticks, DATE_FORMAT, CAST AS SIGNED) = blocker. Cross-DB via `DB::rawQueryGrammar()` (`packages/Webkul/Core/src/Helpers/Database/Grammars/MySQLGrammar.php`, `packages/Webkul/Core/src/Helpers/Database/Grammars/PostgresGrammar.php`) or a `DB::getDriverName() === 'pgsql'` branch.
+- Three drivers ship, not two: `mysql`, `mariadb`, `pgsql`. A branch that decides on `'mysql'` without naming `mariadb` = blocker — Laravel reports MariaDB under its own driver name, so `match ($driver) { 'mysql' => …, 'pgsql' => … }` throws and `=== 'mysql' ? … : …` takes the PostgreSQL path. Group the family (`'mysql', 'mariadb' => …`) as `packages/Webkul/Core/src/Helpers/Database/GrammarQueryManager.php` does. MariaDB has no CI matrix; `packages/Webkul/Core/tests/Unit/DatabaseDriverCoverageTest.php` is the only automated catch.
 - Any Elasticsearch call not gated on `config('elasticsearch.enabled')` with a DB fallback = blocker (`packages/Webkul/Product/src/Factories/ProductQueryBuilderFactory.php`).
 
 ### 7. Security

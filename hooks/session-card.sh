@@ -24,6 +24,13 @@ if [ -f "$DETECT" ]; then
     done < <(bash "$DETECT" "$ROOT" 2>/dev/null)
 fi
 
+DOCTOR="$HERE/doctor.sh"
+[ -f "$DOCTOR" ] || DOCTOR="$HERE/../bin/doctor.sh"
+TOOLING=""
+if [ -f "$DOCTOR" ]; then
+    TOOLING="$(bash "$DOCTOR" "$ROOT" --quiet 2>/dev/null)"
+fi
+
 cat <<CARD
 UnoPim workspace
   root         : $ROOT
@@ -34,5 +41,13 @@ UnoPim workspace
 Standards are enforced at edit time; a block names the rule and the fix, and
 judges only the lines an edit adds.
 CARD
+
+if [ -n "$TOOLING" ]; then
+    printf 'AI tooling gaps (unopim-setup skill):\n'
+    printf '%s\n' "$TOOLING" | sed 's/^/  /'
+    if printf '%s\n' "$TOOLING" | grep -q '^MISSING'; then
+        printf 'Laravel Boost is required. Run the MISSING fix, or %s --fix, before writing code.\n' "$DOCTOR"
+    fi
+fi
 
 exit 0

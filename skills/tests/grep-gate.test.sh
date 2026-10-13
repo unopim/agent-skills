@@ -253,4 +253,17 @@ assert_passes gg_closed_stdin
 assert_passes gg_allows "$GG_TMP/does-not-exist.blade.php"
 assert_passes gg_allows "$GG_VIEWS/binary.blade.php"
 
+# The Laravel config banner is the documented shape for a config rationale and
+# 14 core package configs use it, so CONFIG_COMMENT must permit it while still
+# blocking narration.
+GG_CFG="$GG_TMP/packages/Webkul/Foo/src/Config"
+mkdir -p "$GG_CFG"
+gg_seed "$GG_CFG/banner.php" '<?php' 'return [' '    /*' '    |------' '    | Queue' \
+    '    |------' '    */' "    'queue' => 'foo'," '];'
+gg_seed "$GG_CFG/narrated.php" '<?php' 'return [' '    // narration' "    'x' => 1," '];'
+
+assert_passes gg_allows "$GG_CFG/banner.php"
+assert_passes gg_blocks "$GG_CFG/narrated.php"
+assert_output_contains "CONFIG_COMMENT" gg_out "$GG_CFG/narrated.php"
+
 rm -rf "$GG_TMP" "$GG_NOREPO"

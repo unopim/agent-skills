@@ -23,6 +23,7 @@ reference file that carries the full template. Reference implementation:
 - [ ] Write `ModuleServiceProvider extends CoreModuleServiceProvider` listing every
       model in `$models`.
 - [ ] Register the provider in `bootstrap/providers.php`.
+- [ ] Add the `ModuleServiceProvider` to the `modules` array in `config/concord.php`.
 
 ## Phase 2 — Database and model ([backend.md](backend.md), [credentials.md](credentials.md))
 

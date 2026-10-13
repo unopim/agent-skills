@@ -133,6 +133,17 @@ if [ "$MODE" = baseline ]; then
     exit 0
 fi
 
+# No baseline means the SessionStart hook never ran for this session — the
+# usual cause is installing the hooks into a checkout that a session already
+# had open. Everything already in the tree would then be attributed to this
+# session, so record the baseline now and pass: a sweep that cannot tell the
+# session's work from the branch's is a sweep with nothing to say.
+if [ ! -f "$STATE" ]; then
+    exec "$0" --baseline <<EOF
+$PAYLOAD
+EOF
+fi
+
 # Measuring from the commit the session started on, not from HEAD, is what
 # stops "write it with a redirect, then commit it" from erasing the evidence.
 BASE_REF="$HEAD_SHA"
