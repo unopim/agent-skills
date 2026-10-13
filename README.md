@@ -40,6 +40,30 @@ Use when reviewing UnoPim code changes or a pull request for standards complianc
 
 Use when creating an UnoPim branch, writing a commit message, or opening a pull request against the UnoPim repository. Trigger phrases include "branch", "commit", "commit message", "PR", "pull request", "changelog".
 
+### `unopim-setup`
+
+Use when preparing an UnoPim checkout or a developer machine for AI-assisted work, when the session card lists "AI tooling gaps", when the Laravel Boost MCP server is absent or disconnected, or when deciding which Claude Code plugins and MCP servers an UnoPim developer should have. Trigger phrases include "setup", "laravel boost", "boost mcp", "mcp server", "superpowers", "plugins", "playwright mcp", "doctor", "AI tooling", "onboarding".
+
+### `unopim-ai-agent`
+
+Use when adding, changing or debugging an UnoPim AI agent chat tool — a PimTool class, its ToolRegistry entry or the ai-agent.tools config — or when running, scheduling or extending the ai-agent:* console commands, or provisioning Magic AI platforms with the unopim:magic-ai:platform:* commands. Trigger phrases include "AI agent", "chat tool", "PimTool", "ToolRegistry", "agentic PIM", "agent tool", "Magic AI platform", "quality-monitor", "embeddings:index", "magic-ai:platform".
+
+### `unopim-api`
+
+Use when adding or changing an UnoPim REST API v1 endpoint under /api/v1/rest — AdminApi routes, api-acl.php permissions, an ApiDataSource listing with filters and pagination, ApiFormRequest validation, OAuth tokens, integrations and API keys, the unopim:passport:keys or unopim:passport:client commands, or Pest tests on ApiTestCase — including a plugin package that exposes its own REST endpoints. Trigger phrases include "REST API", "api endpoint", "v1/rest", "api-acl", "ApiDataSource", "passport", "oauth token", "API key", "integration", "This action is unauthorized".
+
+### `unopim-search`
+
+Use when touching UnoPim product or category search — Elasticsearch indexing, the unopim:product:index, unopim:category:index or unopim:elastic:clear commands, config/elasticsearch.php, the ElasticSearch observers, a product filter or sort that must work with Elasticsearch on and off, or a product that saves but does not show up in the grid. Trigger phrases include "elasticsearch", "reindex", "index products", "unopim:product:index", "elastic:clear", "search not updating", "add a filter", "filterable field", "ES enabled", "ES disabled".
+
+### `unopim-catalog-model`
+
+Use when reading or writing UnoPim product values, adding or changing an attribute type, product type, attribute family, group or association type, working with configurable products, variant groups or variant inheritance, listening to catalog.product.* or catalog.attribute.* events, or reasoning about how channel, locale and currency scoping or completeness react to a catalog change. Trigger phrases include "attribute type", "product type", "product values", "values json", "channel_locale_specific", "value_per_locale", "configurable product", "variant", "variants:resync", "strip-redundant", "attribute family", "association type", "catalog.product.update.after", "completeness".
+
+### `unopim-install-upgrade`
+
+Use when installing UnoPim, running or changing unopim:install or unopim:upgrade, writing a migration that must land on existing installs (schema change, data backfill, index on a large table), editing the Installer package's upgrade config, seeders or BackupManager, registering a new package so its migrations and seeders run, or planning post-upgrade steps on host or Docker. Trigger phrases include "install", "unopim:install", "upgrade", "unopim:upgrade", "migration", "data migration", "backfill", "seeder", "backup", "maintenance window", "irreversible", "release upgrade", "migrate --force".
+
 ## Install
 
 `skills` needs a subcommand — `npx skills unopim/agent-skills` on its own exits with
@@ -50,7 +74,9 @@ npx skills add unopim/agent-skills --all
 ```
 
 `--all` is shorthand for `--skill '*' --agent '*' -y`: every skill, every detected agent,
-no prompts. A multi-agent install keeps one copy in `.agents/skills/` and symlinks it into
+no prompts. Without it the CLI opens a picker with **every box unticked** — that default is
+hard-coded in the `skills` CLI and a repository cannot change it; press `a` to toggle all,
+or pass `-y` to take every skill and still choose agents. A multi-agent install keeps one copy in `.agents/skills/` and symlinks it into
 each agent's own directory; a single-agent install writes straight into that agent's
 directory (`.claude/skills/`, `.cursor/skills/`, …). Add `-g` to install into the
 user-level directory instead, and `--copy` where a symlink out of the project tree does
@@ -111,6 +137,30 @@ already exists, then a prompt. Skills are symlinked so a `git pull` here updates
 project at once; use `--copy` inside containers and images where a symlink out of the
 project tree does not resolve, and `--global` to install into `~/<agent-dir>/skills`.
 
+## Required AI tooling
+
+The skills assume the agent can query the running app. **Laravel Boost and its MCP
+server are required**; four more tools are recommended. `bin/doctor.sh` checks all of
+them and the session card repeats the check at every session start.
+
+| Tool | Status | Install |
+|---|---|---|
+| `laravel/boost` + its MCP server | Required | `bin/doctor.sh /path/to/unopim --fix` (runs `composer` and `php artisan boost:install --mcp --guidelines --skills`) |
+| superpowers plugin | Recommended | `/plugin install superpowers@claude-plugins-official` |
+| laravel-boost plugin | Recommended | `/plugin install laravel-boost@claude-plugins-official` |
+| code-review plugin | Recommended | `/plugin install code-review@claude-plugins-official` |
+| Playwright MCP server | Recommended | `claude mcp add playwright -- npx -y @playwright/mcp@latest` |
+
+```bash
+bin/doctor.sh /path/to/unopim          # report; exits 1 when Boost is missing
+bin/doctor.sh /path/to/unopim --fix    # install Boost and wire its MCP server
+```
+
+UnoPim git-ignores `.mcp.json`, `boost.json`, `CLAUDE.md` and `AGENTS.md`, so every fresh
+clone needs `--fix` (or `php artisan boost:install`) once. `bin/install-hooks.sh` runs
+`doctor.sh --fix` for you. Restart the agent afterwards so the MCP server loads. See
+`skills/unopim-setup` for why each tool is there and the container caveat.
+
 ## Enforcement
 
 The skills carry the judgment. The hooks carry the mechanics — the rules a regex can
@@ -124,7 +174,7 @@ paragraph and cannot rationalise past a non-zero exit.
 | `i18n-gate.sh` | writing under `Resources/lang/**` | Any locale below 100% — the key must land in all 33 |
 | `verify-gate.sh` | a completion claim | Calling work done when PHP, Blade, JS or lang files changed since the verification gates last passed |
 | `sweep-gate.sh` | session start (`--baseline`) and a completion claim | Every rule in the table applied to all lines the session added, whatever wrote them — a file written by `sed -i`, a Bash redirect or a script never reaches the edit-time hooks, and a block message that was read but not acted on leaves the violation on disk. Baselines at session start so only what this session adds is reported |
-| `session-card.sh` | session start | Nothing — prints the resolved environment: container or host, port, database and Elasticsearch overrides |
+| `session-card.sh` | session start | Nothing — prints the resolved environment: container or host, port, database and Elasticsearch overrides, plus any AI tooling gap from `doctor.sh` |
 
 Every block names the rule, the fix, and the skill section that explains it.
 
@@ -148,8 +198,9 @@ not the current state.
 ### Installing enforcement
 
 ```bash
-bin/install-hooks.sh /path/to/unopim                   # Claude Code hooks + settings.json
+bin/install-hooks.sh /path/to/unopim                   # Claude Code hooks + settings.json + Boost
 bin/install-hooks.sh /path/to/unopim --with-git-hook   # and a git pre-commit hook
+bin/install-hooks.sh /path/to/unopim --skip-tooling    # hooks only, no composer/boost:install
 ```
 
 Three paths, and most teams want all three:
@@ -167,6 +218,7 @@ All three run the same rule table, so an agent and a developer get the same answ
 ```
 agent-skills/
 ├── bin/
+│   ├── doctor.sh                      # required + recommended AI tooling, --fix installs Boost
 │   ├── install-skills.sh              # skills into any agent, dependencies resolved
 │   ├── install-hooks.sh               # hooks + pre-commit into an UnoPim checkout
 │   ├── lint-skills.sh                 # the authoring standard, enforced
@@ -182,6 +234,12 @@ agent-skills/
 │   ├── unopim-data-transfer/
 │   ├── unopim-code-review/
 │   ├── unopim-git/
+│   ├── unopim-setup/
+│   ├── unopim-ai-agent/
+│   ├── unopim-api/
+│   ├── unopim-search/
+│   ├── unopim-catalog-model/
+│   ├── unopim-install-upgrade/
 │   └── tests/
 ├── AGENTS.md                    # thin router into the skills
 ├── LICENSE

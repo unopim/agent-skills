@@ -61,8 +61,12 @@ UnoPim is a Laravel-based open-source Product Information Management (PIM) syste
 - **Proxy models** — Concord uses proxy models for extensibility (`ProductProxy`, `AdminProxy`). The admin-user model is `Admin`, not `User` — there is no `UserProxy`.
 - **Connectors use cURL** — native cURL, not Guzzle or Laravel HTTP.
 - **No hardcoded strings** — all user-facing text via `trans('package::file.key')`; `en_US` is canonical, propagate to all 33 locales (there is no bare `en` directory).
-- **Comments** — ZERO comments inside method bodies, array literals, or Blade markup. The core baseline: `packages/Webkul/Product/src/Repositories/ProductRepository.php` (18 methods, 0 inline comments) and `packages/Webkul/Product/src/Type/AbstractType.php` (988 lines, 0 inline comments). One-line imperative PHPDoc summaries; a non-obvious "why" goes in the class/method PHPDoc or the commit message, never inline.
+- **Comments** — ZERO comments inside method bodies, array literals, or Blade markup. The core baseline: `packages/Webkul/Product/src/Repositories/ProductRepository.php` (20 methods, 0 inline comments) and `packages/Webkul/Product/src/Type/AbstractType.php` (918 lines, 0 inline comments). One-line imperative PHPDoc summaries; a non-obvious "why" goes in the class/method PHPDoc or the commit message, never inline.
 - **Portability** — MySQL AND PostgreSQL are both supported: no MySQL-only SQL (`GROUP_CONCAT`, backticks, `FIELD()`); use `DB::rawQueryGrammar()` (see `packages/Webkul/Core/src/Helpers/Database/Grammars/MySQLGrammar.php` and `PostgresGrammar.php`) or branch on `DB::getDriverName()`. Elasticsearch is optional — gate on `config('elasticsearch.enabled')` with a database fallback (see `packages/Webkul/Product/src/Factories/ProductQueryBuilderFactory.php`). Package code is web-server-agnostic (Apache, Nginx, Docker).
+
+## Required Tooling
+
+Laravel Boost and its MCP server are required: confirm `laravel-boost` is connected before writing code, and if it is not, stop and point the user at `doctor.sh --fix` (`unopim-setup`). The superpowers, laravel-boost and code-review Claude Code plugins and a Playwright MCP server are recommended — report a gap, do not install them unasked.
 
 ## Skills Activation
 
@@ -76,6 +80,12 @@ Activate the relevant skill whenever you work in its domain — do not wait unti
 - `unopim-data-transfer` — import/export pipeline, exporters, importers, validators.
 - `unopim-code-review` — reviewing changes against the standards.
 - `unopim-git` — branches, commit messages, pull requests.
+- `unopim-setup` — required and recommended AI tooling (Laravel Boost MCP, plugins, Playwright MCP) and `doctor.sh`.
+- `unopim-ai-agent` — AiAgent chat tools (`PimTool`, `ToolRegistry`), `ai-agent:*` commands, MagicAI platforms.
+- `unopim-api` — AdminApi REST v1 endpoints, Passport, `api-acl.php`.
+- `unopim-search` — Elasticsearch indexing, reindex commands, the ES-on/ES-off contract.
+- `unopim-catalog-model` — product types, attributes, families, scoped values, variants.
+- `unopim-install-upgrade` — `unopim:install`, `unopim:upgrade`, upgrade steps, migration safety.
 
 ## Verification
 
